@@ -4,3 +4,9 @@
 *.ptx
 *.cubin
 *.fatbin
+
+main
+alignSequence
+
+*.json
+**/.DS_STORE
