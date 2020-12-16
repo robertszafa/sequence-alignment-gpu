@@ -9,4 +9,4 @@ alignSequence : alignSequence.cu
 		$(NVCC) $(NVCCFLAGS) alignSequence.cu -o $(BIN)
 
 clean :
-		rm *.o $(BIN)
+		rm $(BIN)

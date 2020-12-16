@@ -54,7 +54,4 @@ void parseArguments(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
     parseArguments(argc, argv);
-
-    std::cout << SequenceAlignment::deviceType << std::endl;
-    std::cout << SequenceAlignment::sequenceType << std::endl;
 }
