@@ -4,13 +4,11 @@
 
 #include <iostream>
 #include <fstream>
-#include <stdlib.h>
-#include <cstring>
 
 void parseArguments(int argc, char *argv[])
 {
-    if (argc < 2)
-        std::cerr << "Usage: " << SequenceAlignment::USAGE << std::endl;
+    // We need at least the text and pattern file.
+    if (argc < 3) std::cerr << "Usage: " << SequenceAlignment::USAGE << std::endl;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -38,8 +36,21 @@ void parseArguments(int argc, char *argv[])
             std::ifstream f(argv[i]);
             if (f.good())
             {
-                // :TODO: Read 2 files: text and pattern.
-                //        What format are the sequences in? Just one line of characters?
+                // Use string's range constructor to copy over entire file to memory.
+                std::string fileString((std::istreambuf_iterator<char>(f)),
+                                        std::istreambuf_iterator<char>());
+
+                if (SequenceAlignment::textNumBytes == 0)
+                {
+                    SequenceAlignment::textBytes = fileString.c_str();
+                    SequenceAlignment::textNumBytes = fileString.length();
+                }
+                else
+                {
+                    SequenceAlignment::patternBytes = fileString.c_str();
+                    SequenceAlignment::patternNumBytes = fileString.length();
+                }
+
             }
             else
             {
@@ -54,4 +65,6 @@ void parseArguments(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
     parseArguments(argc, argv);
+
+    std::cout << SequenceAlignment::textNumBytes << " " << SequenceAlignment::patternNumBytes << "\n";
 }

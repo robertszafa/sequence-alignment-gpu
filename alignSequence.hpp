@@ -6,7 +6,7 @@
 
 namespace SequenceAlignment
 {
-    const std::string USAGE = "alignSequence [-p -d -cpu] [sequenceFile]";
+    const std::string USAGE = "alignSequence [-p -d -cpu] [textSequenceFile] [patternSequenceFile]";
 
     enum programArgs
     {
@@ -26,8 +26,11 @@ namespace SequenceAlignment
     /// Default is DNA.
     int sequenceType = programArgs::DNA;
 
-    char* textBytes;
 
-    char* patternBytes;
+    const char* textBytes;
+    int textNumBytes = 0;
+
+    const char* patternBytes;
+    int patternNumBytes = 0;
 
 } // namespace SequenceAlignment
