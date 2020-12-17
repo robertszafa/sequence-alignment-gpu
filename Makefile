@@ -8,12 +8,12 @@ TEST_BIN=runTests
 
 all : alignSequence test
 
-alignSequence : alignSequence.cu
+alignSequence : alignSequence.cu utils.hpp
 		$(NVCC) $(CXXFLAGS) alignSequence.cu -o $(BIN)
 
-test : test/tests.cpp
+test : test/tests.cpp utils.hpp
 		$(NVCC) $(CXXFLAGS) test/tests.cpp -o $(TEST_BIN)
 
 
 clean :
-		rm $(BIN)
+		rm $(BIN) $(TEST_BIN)

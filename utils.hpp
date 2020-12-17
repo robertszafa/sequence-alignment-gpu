@@ -6,7 +6,11 @@
 void parseArguments(int argc, const char *argv[])
 {
     // We need at least the text and pattern file.
-    if (argc < 3) std::cerr << SequenceAlignment::USAGE;
+    if (argc < 3)
+    {
+        std::cerr << SequenceAlignment::USAGE;
+        return;
+    }
 
     for (int i = 1; i < argc; ++i)
     {
@@ -52,10 +56,16 @@ void parseArguments(int argc, const char *argv[])
             }
             else
             {
-                std::cout << argv[i] << " file does not exist" << std::endl;
+                std::cerr << argv[i] << " file does not exist" << std::endl;
             }
 
             f.close();
         }
+    }
+
+    if (SequenceAlignment::textNumBytes == 0 || SequenceAlignment::patternNumBytes == 0)
+    {
+        std::cerr << "textSequence or patternSequence not read." << std::endl;
+        std::cerr << SequenceAlignment::USAGE;
     }
 }
