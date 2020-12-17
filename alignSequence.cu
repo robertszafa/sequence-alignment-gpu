@@ -1,4 +1,4 @@
-#include "alignSequence.hpp"
+#include "SequenceAlignment.hpp"
 
 #include <cuda.h>
 
