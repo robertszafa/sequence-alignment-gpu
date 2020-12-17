@@ -1,12 +1,19 @@
 # nvcc --std=c++11 alignSequence.cu -o alignSequence
 NVCC=nvcc
-NVCCFLAGS=-std=c++11
-BIN=alignSequence
+CXX=clang++
+CXXFLAGS=-std=c++11
 
-all : alignSequence
+BIN=alignSequence
+TEST_BIN=runTests
+
+all : alignSequence test
 
 alignSequence : alignSequence.cu
-		$(NVCC) $(NVCCFLAGS) alignSequence.cu -o $(BIN)
+		$(NVCC) $(CXXFLAGS) alignSequence.cu -o $(BIN)
+
+test : test/tests.cpp
+		$(NVCC) $(CXXFLAGS) test/tests.cpp -o $(TEST_BIN)
+
 
 clean :
 		rm $(BIN)

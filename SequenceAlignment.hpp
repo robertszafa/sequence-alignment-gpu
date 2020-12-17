@@ -34,3 +34,6 @@ namespace SequenceAlignment
     int patternNumBytes = 0;
 
 } // namespace SequenceAlignment
+
+
+void parseArguments(int, const char**);

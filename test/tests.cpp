@@ -2,11 +2,11 @@
 #include "catch.hpp"
 
 #include "../SequenceAlignment.hpp"
+#include "../utils.hpp"
 
 TEST_CASE( "Parsing command line arguments", "[parseArguments]" ) {
     char* argv[10];
 
-    argv[0] = "alignSequence";
+    argv[0] = (char*) "alignSequence";
     parseArguments(1, (const char**) argv);
-    // REQUIRE(parseArguments(1, argv) == SequenceAlignment::USAGE);
 }
