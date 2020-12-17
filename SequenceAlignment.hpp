@@ -6,7 +6,7 @@
 
 namespace SequenceAlignment
 {
-    const std::string USAGE = "alignSequence [-p -d -cpu] [textSequenceFile] [patternSequenceFile]";
+    const std::string USAGE = "Usage: alignSequence [-p -d -cpu] [textSequenceFile] [patternSequenceFile]\n";
 
     enum programArgs
     {

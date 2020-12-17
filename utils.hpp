@@ -6,7 +6,7 @@
 void parseArguments(int argc, const char *argv[])
 {
     // We need at least the text and pattern file.
-    if (argc < 3) std::cerr << "Usage: " << SequenceAlignment::USAGE << std::endl;
+    if (argc < 3) std::cerr << SequenceAlignment::USAGE;
 
     for (int i = 1; i < argc; ++i)
     {
