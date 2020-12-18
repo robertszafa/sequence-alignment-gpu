@@ -26,11 +26,12 @@ namespace SequenceAlignment
     /// Default is DNA.
     int sequenceType = programArgs::DNA;
 
+    const unsigned int MAX_SEQUENCE_LEN = 524288;
 
-    const char* textBytes;
+    char textBytes[MAX_SEQUENCE_LEN];
     int textNumBytes = 0;
 
-    const char* patternBytes;
+    char patternBytes[MAX_SEQUENCE_LEN];
     int patternNumBytes = 0;
 
 } // namespace SequenceAlignment

@@ -1,6 +1,7 @@
 #include "SequenceAlignment.hpp"
 
 #include <iostream>
+#include <algorithm>
 #include <fstream>
 
 void parseArguments(int argc, const char *argv[])
@@ -44,13 +45,17 @@ void parseArguments(int argc, const char *argv[])
 
                 if (SequenceAlignment::textNumBytes == 0)
                 {
-                    SequenceAlignment::textBytes = fileString.c_str();
                     SequenceAlignment::textNumBytes = fileString.length();
+                    std::copy_n(fileString.begin(),
+                                SequenceAlignment::textNumBytes,
+                                SequenceAlignment::textBytes);
                 }
                 else
                 {
-                    SequenceAlignment::patternBytes = fileString.c_str();
                     SequenceAlignment::patternNumBytes = fileString.length();
+                    std::copy_n(fileString.begin(),
+                                SequenceAlignment::patternNumBytes,
+                                SequenceAlignment::patternBytes);
                 }
 
             }
@@ -65,7 +70,7 @@ void parseArguments(int argc, const char *argv[])
 
     if (SequenceAlignment::textNumBytes == 0 || SequenceAlignment::patternNumBytes == 0)
     {
-        std::cerr << "textSequence or patternSequence not read." << std::endl;
+        std::cerr << "textSequence or patternSequence not read" << std::endl;
         std::cerr << SequenceAlignment::USAGE;
     }
 }

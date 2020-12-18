@@ -5,6 +5,8 @@
 #include "../SequenceAlignment.hpp"
 #include "../utils.hpp"
 
+#include <algorithm>
+
 
 TEST_CASE( "parseArguments")
 {
@@ -28,7 +30,7 @@ TEST_CASE( "parseArguments")
         const char *argv[argc] = { "./alignSequence", "-p", "-c"};
         parseArguments(argc, argv);
 
-        std::string expectedMsg = "textSequence or patternSequence not read.\n" + SequenceAlignment::USAGE;
+        std::string expectedMsg = "textSequence or patternSequence not read\n" + SequenceAlignment::USAGE;
         std::string stderrString = buffer.str();
         REQUIRE(stderrString == expectedMsg);
 
@@ -36,6 +38,24 @@ TEST_CASE( "parseArguments")
         REQUIRE(SequenceAlignment::sequenceType == SequenceAlignment::programArgs::PROTEIN);
     }
 
-    // Restore original buffer.
-    std::cout.rdbuf(old);
+    SECTION("reading data from files")
+    {
+        const int argc = 5;
+        const char *argv[argc] = { "./alignSequence", "-g", "-d",
+                                   "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
+        parseArguments(argc, argv);
+
+        const char* expectedText = "ACACGCTAG";
+        const char* expectedPattern = "CCTATGGCTG";
+
+        REQUIRE(SequenceAlignment::deviceType == SequenceAlignment::programArgs::GPU);
+        REQUIRE(SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA);
+
+        REQUIRE(std::equal(SequenceAlignment::textBytes,
+                           SequenceAlignment::textBytes + SequenceAlignment::textNumBytes,
+                           expectedText));
+        REQUIRE(std::equal(SequenceAlignment::patternBytes,
+                           SequenceAlignment::patternBytes + SequenceAlignment::patternNumBytes,
+                           expectedPattern));
+    }
 }
