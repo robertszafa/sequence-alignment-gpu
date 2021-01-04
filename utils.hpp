@@ -4,6 +4,44 @@
 #include <algorithm>
 #include <fstream>
 
+
+void parseScoreMatrixFile(const std::string fname)
+{
+    std::ifstream f(fname);
+    if (f.good())
+    {
+        const auto sequenceOrderedChars = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
+                                          ? SequenceAlignment::dnaScoreMatrixCharOrder
+                                          : SequenceAlignment::proteinScoreMatrixCharOrder;
+        const auto numChars = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
+                            ? SequenceAlignment::NUM_DNA_CHARS
+                            : SequenceAlignment::NUM_PROTEIN_CHARS;
+
+        short nextScore;
+        for (int i=0; i<numChars; ++i)
+        {
+            for (int j=0; j<numChars; ++j)
+            {
+                f >> nextScore;
+                short char1 = (short) sequenceOrderedChars[i];
+                short char2 = (short) sequenceOrderedChars[j];
+
+                const short key = (char1 << 8) & char2;
+                SequenceAlignment::scoreMap[key] = nextScore;
+
+                std::cout << sequenceOrderedChars[i] << ", " << sequenceOrderedChars[j] << " = " << nextScore <<"\n";
+            }
+        }
+    }
+    else
+    {
+        std::cerr << fname << " file does not exist" << std::endl;
+    }
+
+    f.close();
+
+}
+
 void parseArguments(int argc, const char *argv[])
 {
     // We need at least the text and pattern file.
@@ -13,10 +51,13 @@ void parseArguments(int argc, const char *argv[])
         return;
     }
 
+    bool nextIsScoreMatrixFile = false;
     for (int i = 1; i < argc; ++i)
     {
+        // Device and sequence type flags.
         if (argv[i][0] == '-' && strlen(argv[i]) > 1)
         {
+            // Check if the flag is valid.
             if (SequenceAlignment::argumentMap.count(argv[i][1]) > 0)
             {
                 auto setArg = SequenceAlignment::argumentMap.at(argv[i][1]);
@@ -28,13 +69,19 @@ void parseArguments(int argc, const char *argv[])
                                                   (setArg == SequenceAlignment::programArgs::PROTEIN)
                                                   ? setArg
                                                   : SequenceAlignment::sequenceType;
+                nextIsScoreMatrixFile = (setArg == SequenceAlignment::programArgs::SCORE_MATRIX);
             }
             else
             {
                 std::cerr << "Ignoring \"" << argv[i] << "\"" << std::endl;
             }
         }
-        else
+        else if (nextIsScoreMatrixFile)
+        {
+            parseScoreMatrixFile(argv[i]);
+            nextIsScoreMatrixFile = false;
+        }
+        else // Sequence file names.
         {
             std::ifstream f(argv[i]);
             if (f.good())
@@ -72,5 +119,15 @@ void parseArguments(int argc, const char *argv[])
     {
         std::cerr << "textSequence or patternSequence not read" << std::endl;
         std::cerr << SequenceAlignment::USAGE;
+        return;
+    }
+
+    // Read in defualt scores.
+    if (SequenceAlignment::scoreMap.size() == 0)
+    {
+        const auto scoreMatrixFile = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
+                                     ? SequenceAlignment::defaultDnaScoreMatrixFile
+                                     : SequenceAlignment::defaultProteinScoreMatrixFile;
+        parseScoreMatrixFile(scoreMatrixFile);
     }
 }

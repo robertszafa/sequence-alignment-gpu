@@ -8,7 +8,7 @@ TEST_BIN=runTests
 
 all : alignSequence test
 
-alignSequence : alignSequence.cu utils.hpp
+alignSequence : alignSequence.cu utils.hpp SequenceAlignment.hpp
 		$(NVCC) $(CXXFLAGS) alignSequence.cu -o $(BIN)
 
 test : test/tests.cpp utils.hpp
