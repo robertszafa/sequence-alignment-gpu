@@ -11,5 +11,4 @@ int main(int argc, const char *argv[])
 {
     parseArguments(argc, argv);
 
-    std::cout << SequenceAlignment::textNumBytes << " " << SequenceAlignment::patternNumBytes << "\n";
 }

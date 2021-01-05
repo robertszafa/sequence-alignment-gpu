@@ -30,7 +30,7 @@ TEST_CASE( "parseArguments")
         const char *argv[argc] = { "./alignSequence", "-p", "-c"};
         parseArguments(argc, argv);
 
-        std::string expectedMsg = "textSequence or patternSequence not read\n" + SequenceAlignment::USAGE;
+        std::string expectedMsg = SequenceAlignment::SEQ_NOT_READ_ERROR + SequenceAlignment::USAGE;
         std::string stderrString = buffer.str();
         REQUIRE(stderrString == expectedMsg);
 
@@ -38,7 +38,19 @@ TEST_CASE( "parseArguments")
         REQUIRE(SequenceAlignment::sequenceType == SequenceAlignment::programArgs::PROTEIN);
     }
 
-    SECTION("reading data from files")
+    SECTION("incorrect score matrix")
+    {
+        const int argc = 5;
+        const char *argv[argc] = { "./alignSequence", "-m", "test/corruptScoreMatrix.txt",
+                                   "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
+        parseArguments(argc, argv);
+
+        std::string expectedMsg = SequenceAlignment::SCORE_MATRIX_NOT_READ_WARNING;
+        std::string stderrString = buffer.str();
+        REQUIRE(stderrString == expectedMsg);
+    }
+
+    SECTION("reading sequences from files")
     {
         const int argc = 5;
         const char *argv[argc] = { "./alignSequence", "-g", "-d",
@@ -57,5 +69,18 @@ TEST_CASE( "parseArguments")
         REQUIRE(std::equal(SequenceAlignment::patternBytes,
                            SequenceAlignment::patternBytes + SequenceAlignment::patternNumBytes,
                            expectedPattern));
+    }
+
+    SECTION("reading score matrix from file")
+    {
+        const int argc = 6;
+        const char *argv[argc] = { "./alignSequence", "-d", "-m", "scoreMatrices/dna/blast.txt",
+                                   "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
+        parseArguments(argc, argv);
+
+        REQUIRE(SequenceAlignment::scoreMap[twoCharsToKey('A', 'A')] == 5);
+        REQUIRE(SequenceAlignment::scoreMap[twoCharsToKey('G', 'T')] == -4);
+        REQUIRE(SequenceAlignment::scoreMap[twoCharsToKey('C', '*')] == -1);
+        REQUIRE(SequenceAlignment::scoreMap[twoCharsToKey('*', '*')] == 1);
     }
 }

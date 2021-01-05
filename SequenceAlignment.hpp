@@ -10,6 +10,8 @@ namespace SequenceAlignment
                               \n\t-p, -d             -- protein or dna sequence (dna by default)\
                               \n\t-c, -g             -- cpu or gpu device (cpu by default)\
                               \n\t-m scoreMatrixFile -- file with custom scoring matrix (blast for dna, XYZ for protein by default)\n";
+    const std::string SEQ_NOT_READ_ERROR = "Error:\ttextSequence or patternSequence not read\n";
+    const std::string SCORE_MATRIX_NOT_READ_WARNING = "Warining:\ttextSequence or patternSequence not read\n";
 
     enum programArgs
     {

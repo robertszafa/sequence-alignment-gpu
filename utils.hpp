@@ -5,6 +5,13 @@
 #include <fstream>
 
 
+/// Given 2 8-bit characters, construct a unique 16-bit key.
+short twoCharsToKey(char char1, char char2)
+{
+    // Cast to short, shift char1 to upper 8 bits and OR char2 to lower 8 bits.
+    return (((short) char1) << 8) | char2;
+}
+
 void parseScoreMatrixFile(const std::string fname)
 {
     std::ifstream f(fname);
@@ -22,14 +29,16 @@ void parseScoreMatrixFile(const std::string fname)
         {
             for (int j=0; j<numChars; ++j)
             {
-                f >> nextScore;
-                short char1 = (short) sequenceOrderedChars[i];
-                short char2 = (short) sequenceOrderedChars[j];
+                // Check if valid.
+                if (!(f >> nextScore))
+                {
+                    std::cerr << SequenceAlignment::SCORE_MATRIX_NOT_READ_WARNING;
+                    SequenceAlignment::scoreMap.clear();
+                    return;
+                }
 
-                const short key = (char1 << 8) & char2;
+                const short key = twoCharsToKey(sequenceOrderedChars[i], sequenceOrderedChars[j]);
                 SequenceAlignment::scoreMap[key] = nextScore;
-
-                std::cout << sequenceOrderedChars[i] << ", " << sequenceOrderedChars[j] << " = " << nextScore <<"\n";
             }
         }
     }
@@ -37,9 +46,44 @@ void parseScoreMatrixFile(const std::string fname)
     {
         std::cerr << fname << " file does not exist" << std::endl;
     }
+}
 
-    f.close();
+/// Given a filename, copy the chars (bytes) from the file into a buffer.
+/// If the text sequence buffer is empty, it is filled.
+/// Else if the pattern sequence buffer is empty, it is filled.
+/// Else the file is ignored.
+void readSequenceBytes(const std::string fname)
+{
+    std::ifstream f(fname);
+    if (f.good())
+    {
+        // Use string's range constructor to copy over entire file to memory.
+        std::string fileString((std::istreambuf_iterator<char>(f)),
+                                std::istreambuf_iterator<char>());
 
+        if (SequenceAlignment::textNumBytes == 0)
+        {
+            SequenceAlignment::textNumBytes = fileString.length();
+            std::copy_n(fileString.begin(),
+                        SequenceAlignment::textNumBytes,
+                        SequenceAlignment::textBytes);
+        }
+        else if (SequenceAlignment::patternNumBytes == 0)
+        {
+            SequenceAlignment::patternNumBytes = fileString.length();
+            std::copy_n(fileString.begin(),
+                        SequenceAlignment::patternNumBytes,
+                        SequenceAlignment::patternBytes);
+        }
+        else
+        {
+            std::cerr << "Ignoring file " << fname << std::endl;
+        }
+    }
+    else
+    {
+        std::cerr << fname << " file does not exist" << std::endl;
+    }
 }
 
 void parseArguments(int argc, const char *argv[])
@@ -54,7 +98,7 @@ void parseArguments(int argc, const char *argv[])
     bool nextIsScoreMatrixFile = false;
     for (int i = 1; i < argc; ++i)
     {
-        // Device and sequence type flags.
+        // Flags
         if (argv[i][0] == '-' && strlen(argv[i]) > 1)
         {
             // Check if the flag is valid.
@@ -76,49 +120,22 @@ void parseArguments(int argc, const char *argv[])
                 std::cerr << "Ignoring \"" << argv[i] << "\"" << std::endl;
             }
         }
+        // Files to read
         else if (nextIsScoreMatrixFile)
         {
             parseScoreMatrixFile(argv[i]);
             nextIsScoreMatrixFile = false;
+
         }
-        else // Sequence file names.
+        else
         {
-            std::ifstream f(argv[i]);
-            if (f.good())
-            {
-                // Use string's range constructor to copy over entire file to memory.
-                std::string fileString((std::istreambuf_iterator<char>(f)),
-                                        std::istreambuf_iterator<char>());
-
-                if (SequenceAlignment::textNumBytes == 0)
-                {
-                    SequenceAlignment::textNumBytes = fileString.length();
-                    std::copy_n(fileString.begin(),
-                                SequenceAlignment::textNumBytes,
-                                SequenceAlignment::textBytes);
-                }
-                else
-                {
-                    SequenceAlignment::patternNumBytes = fileString.length();
-                    std::copy_n(fileString.begin(),
-                                SequenceAlignment::patternNumBytes,
-                                SequenceAlignment::patternBytes);
-                }
-
-            }
-            else
-            {
-                std::cerr << argv[i] << " file does not exist" << std::endl;
-            }
-
-            f.close();
+            readSequenceBytes(argv[i]);
         }
     }
 
     if (SequenceAlignment::textNumBytes == 0 || SequenceAlignment::patternNumBytes == 0)
     {
-        std::cerr << "textSequence or patternSequence not read" << std::endl;
-        std::cerr << SequenceAlignment::USAGE;
+        std::cerr << SequenceAlignment::SEQ_NOT_READ_ERROR << SequenceAlignment::USAGE;
         return;
     }
 
