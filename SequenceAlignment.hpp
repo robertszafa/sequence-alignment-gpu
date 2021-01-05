@@ -46,15 +46,17 @@ namespace SequenceAlignment
     const unsigned int NUM_DNA_CHARS = 5;
     const unsigned int NUM_PROTEIN_CHARS = 25;
 
-    /// Each combination of 2 sequence characters is mapped to a score value.
-    /// A unique 16-bit integer key can be created from 2 characters: (char1 << 8) & char2
-    std::unordered_map<short, short> scoreMap;
 
     /// The order of scores in a file with a scoring matrix is fixed ('*' represents a gap).
+    /// Characters are transformed into ordered integers, e.g. for DNA A->0, T->1, C->3, ...
     const char dnaScoreMatrixCharOrder[] =  {'A', 'T', 'C', 'G', '*'};
     const char proteinScoreMatrixCharOrder[] =  {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I',
                                                  'L', 'K', 'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V',
                                                  'B', 'J', 'Z', 'X', '*'};
+
+    /// Substitution matrix stored in row major order.
+    /// To get the score of substituting 'C (2)' for 'G (4)' do scoreMatrix[2*NUM_DNA_CHARS + 4]
+    short scoreMatrix[NUM_PROTEIN_CHARS*NUM_PROTEIN_CHARS];
 
     const std::string defaultDnaScoreMatrixFile = "scoreMatrices/dna/blast.txt";
     const std::string defaultProteinScoreMatrixFile = "scoreMatrices/protein/blosum50.txt";

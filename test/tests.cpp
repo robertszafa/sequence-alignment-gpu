@@ -78,9 +78,9 @@ TEST_CASE( "parseArguments")
                                    "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
         parseArguments(argc, argv);
 
-        REQUIRE(SequenceAlignment::scoreMap[twoCharsToKey('A', 'A')] == 5);
-        REQUIRE(SequenceAlignment::scoreMap[twoCharsToKey('G', 'T')] == -4);
-        REQUIRE(SequenceAlignment::scoreMap[twoCharsToKey('C', '*')] == -1);
-        REQUIRE(SequenceAlignment::scoreMap[twoCharsToKey('*', '*')] == 1);
+        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('A', 'A')] == 5);
+        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('G', 'T')] == -4);
+        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('C', '*')] == -1);
+        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('*', '*')] == 1);
     }
 }

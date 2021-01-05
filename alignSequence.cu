@@ -9,6 +9,8 @@
 
 int main(int argc, const char *argv[])
 {
-    parseArguments(argc, argv);
+    if (parseArguments(argc, argv) == -1) return -1;
 
+
+    return 0;
 }

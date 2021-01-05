@@ -4,22 +4,27 @@
 #include <algorithm>
 #include <fstream>
 
-
-/// Given 2 8-bit characters, construct a unique 16-bit key.
-short twoCharsToKey(char char1, char char2)
+int getScoreIndex(char char1, char char2)
 {
-    // Cast to short, shift char1 to upper 8 bits and OR char2 to lower 8 bits.
-    return (((short) char1) << 8) | char2;
+    const auto predicate = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA);
+    const auto sequenceOrderedChars = predicate
+                                      ? SequenceAlignment::dnaScoreMatrixCharOrder
+                                      : SequenceAlignment::proteinScoreMatrixCharOrder;
+    const auto numChars = predicate
+                          ? SequenceAlignment::NUM_DNA_CHARS
+                          : SequenceAlignment::NUM_PROTEIN_CHARS;
+
+    int val1 = std::find(sequenceOrderedChars, sequenceOrderedChars+numChars, char1) - sequenceOrderedChars;
+    int val2 = std::find(sequenceOrderedChars, sequenceOrderedChars+numChars, char2) - sequenceOrderedChars;
+
+    return val1 * numChars + val2;
 }
 
-void parseScoreMatrixFile(const std::string fname)
+int parseScoreMatrixFile(const std::string fname)
 {
     std::ifstream f(fname);
     if (f.good())
     {
-        const auto sequenceOrderedChars = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
-                                          ? SequenceAlignment::dnaScoreMatrixCharOrder
-                                          : SequenceAlignment::proteinScoreMatrixCharOrder;
         const auto numChars = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
                             ? SequenceAlignment::NUM_DNA_CHARS
                             : SequenceAlignment::NUM_PROTEIN_CHARS;
@@ -31,14 +36,9 @@ void parseScoreMatrixFile(const std::string fname)
             {
                 // Check if valid.
                 if (!(f >> nextScore))
-                {
-                    std::cerr << SequenceAlignment::SCORE_MATRIX_NOT_READ_WARNING;
-                    SequenceAlignment::scoreMap.clear();
-                    return;
-                }
+                    return -1;
 
-                const short key = twoCharsToKey(sequenceOrderedChars[i], sequenceOrderedChars[j]);
-                SequenceAlignment::scoreMap[key] = nextScore;
+                SequenceAlignment::scoreMatrix[i * numChars + j] = nextScore;
             }
         }
     }
@@ -46,13 +46,15 @@ void parseScoreMatrixFile(const std::string fname)
     {
         std::cerr << fname << " file does not exist" << std::endl;
     }
+
+    return 0;
 }
 
 /// Given a filename, copy the chars (bytes) from the file into a buffer.
 /// If the text sequence buffer is empty, it is filled.
 /// Else if the pattern sequence buffer is empty, it is filled.
 /// Else the file is ignored.
-void readSequenceBytes(const std::string fname)
+int readSequenceBytes(const std::string fname)
 {
     std::ifstream f(fname);
     if (f.good())
@@ -83,16 +85,19 @@ void readSequenceBytes(const std::string fname)
     else
     {
         std::cerr << fname << " file does not exist" << std::endl;
+        return -1;
     }
+
+    return 0;
 }
 
-void parseArguments(int argc, const char *argv[])
+int parseArguments(int argc, const char *argv[])
 {
     // We need at least the text and pattern file.
     if (argc < 3)
     {
         std::cerr << SequenceAlignment::USAGE;
-        return;
+        return -1;
     }
 
     bool nextIsScoreMatrixFile = false;
@@ -123,28 +128,33 @@ void parseArguments(int argc, const char *argv[])
         // Files to read
         else if (nextIsScoreMatrixFile)
         {
-            parseScoreMatrixFile(argv[i]);
+            if (parseScoreMatrixFile(argv[i]) == -1)
+            {
+                // Read in defualt scores.
+                std::cerr << SequenceAlignment::SCORE_MATRIX_NOT_READ_WARNING;
+                const auto scoreMatrixFile = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
+                                            ? SequenceAlignment::defaultDnaScoreMatrixFile
+                                            : SequenceAlignment::defaultProteinScoreMatrixFile;
+                parseScoreMatrixFile(scoreMatrixFile);
+            }
             nextIsScoreMatrixFile = false;
-
         }
         else
         {
-            readSequenceBytes(argv[i]);
+            if (readSequenceBytes(argv[i]) == -1)
+            {
+                std::cerr << SequenceAlignment::SEQ_NOT_READ_ERROR << SequenceAlignment::USAGE;
+                return -1;
+            }
         }
     }
 
     if (SequenceAlignment::textNumBytes == 0 || SequenceAlignment::patternNumBytes == 0)
     {
         std::cerr << SequenceAlignment::SEQ_NOT_READ_ERROR << SequenceAlignment::USAGE;
-        return;
+        return -1;
     }
 
-    // Read in defualt scores.
-    if (SequenceAlignment::scoreMap.size() == 0)
-    {
-        const auto scoreMatrixFile = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
-                                     ? SequenceAlignment::defaultDnaScoreMatrixFile
-                                     : SequenceAlignment::defaultProteinScoreMatrixFile;
-        parseScoreMatrixFile(scoreMatrixFile);
-    }
+
+    return 0;
 }
