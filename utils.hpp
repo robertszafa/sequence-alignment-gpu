@@ -4,47 +4,35 @@
 #include <algorithm>
 #include <fstream>
 
-int getScoreIndex(char char1, char char2)
+/// Given a letter from the dna or protein alphabet return the index of that letter
+/// in the ordered alphabet array.
+char letterToInt(char letter)
 {
-    const auto predicate = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA);
-    const auto sequenceOrderedChars = predicate
-                                      ? SequenceAlignment::dnaScoreMatrixCharOrder
-                                      : SequenceAlignment::proteinScoreMatrixCharOrder;
-    const auto numChars = predicate
-                          ? SequenceAlignment::NUM_DNA_CHARS
-                          : SequenceAlignment::NUM_PROTEIN_CHARS;
+    auto letterItr = std::find(SequenceAlignment::alphabet,
+                               SequenceAlignment::alphabet + SequenceAlignment::alphabetSize,
+                               letter);
+    if (letterItr == (SequenceAlignment::alphabet + SequenceAlignment::alphabetSize)) return -1;
 
-    int val1 = std::find(sequenceOrderedChars, sequenceOrderedChars+numChars, char1) - sequenceOrderedChars;
-    int val2 = std::find(sequenceOrderedChars, sequenceOrderedChars+numChars, char2) - sequenceOrderedChars;
-
-    return val1 * numChars + val2;
+    return std::distance(SequenceAlignment::alphabet, letterItr);
 }
 
-int parseScoreMatrixFile(const std::string fname)
+int getScoreIndex(char char1, char char2)
 {
-    std::ifstream f(fname);
-    if (f.good())
-    {
-        const auto numChars = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
-                            ? SequenceAlignment::NUM_DNA_CHARS
-                            : SequenceAlignment::NUM_PROTEIN_CHARS;
+    return letterToInt(char1) * SequenceAlignment::alphabetSize + letterToInt(char2);
+}
 
-        short nextScore;
-        for (int i=0; i<numChars; ++i)
+int validateAndTransform(const std::string &sequence, char *dstBuffer)
+{
+    for (int i=0; i<sequence.length(); ++i)
+    {
+        const char upperLetter = (sequence[i] > 90) ? sequence[i] - 32 : sequence[i];
+
+        dstBuffer[i] = letterToInt(upperLetter);
+        if (dstBuffer[i] == -1)
         {
-            for (int j=0; j<numChars; ++j)
-            {
-                // Check if valid.
-                if (!(f >> nextScore))
-                    return -1;
-
-                SequenceAlignment::scoreMatrix[i * numChars + j] = nextScore;
-            }
+            std::cerr << "'" << sequence[i] << "'" << " letter not in alphabet." << std::endl;
+            return -1;
         }
-    }
-    else
-    {
-        std::cerr << fname << " file does not exist" << std::endl;
     }
 
     return 0;
@@ -60,22 +48,17 @@ int readSequenceBytes(const std::string fname)
     if (f.good())
     {
         // Use string's range constructor to copy over entire file to memory.
-        std::string fileString((std::istreambuf_iterator<char>(f)),
-                                std::istreambuf_iterator<char>());
+        std::string fileString((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 
         if (SequenceAlignment::textNumBytes == 0)
         {
             SequenceAlignment::textNumBytes = fileString.length();
-            std::copy_n(fileString.begin(),
-                        SequenceAlignment::textNumBytes,
-                        SequenceAlignment::textBytes);
+            if (validateAndTransform(fileString, SequenceAlignment::textBytes) == -1) return -1;
         }
         else if (SequenceAlignment::patternNumBytes == 0)
         {
             SequenceAlignment::patternNumBytes = fileString.length();
-            std::copy_n(fileString.begin(),
-                        SequenceAlignment::patternNumBytes,
-                        SequenceAlignment::patternBytes);
+            if (validateAndTransform(fileString, SequenceAlignment::patternBytes) == -1) return -1;
         }
         else
         {
@@ -91,10 +74,35 @@ int readSequenceBytes(const std::string fname)
     return 0;
 }
 
+int parseScoreMatrixFile(const std::string fname)
+{
+    std::ifstream f(fname);
+    if (f.good())
+    {
+        short nextScore;
+        for (int i=0; i<SequenceAlignment::alphabetSize; ++i)
+        {
+            for (int j=0; j<SequenceAlignment::alphabetSize; ++j)
+            {
+                // Check if 16-bit number.
+                if (!(f >> nextScore)) return -1;
+
+                SequenceAlignment::scoreMatrix[i * SequenceAlignment::alphabetSize + j] = nextScore;
+            }
+        }
+    }
+    else
+    {
+        std::cerr << fname << " file does not exist" << std::endl;
+    }
+
+    return 0;
+}
+
 int parseArguments(int argc, const char *argv[])
 {
     // We need at least the text and pattern file.
-    if (argc < 3)
+    if (argc == 1)
     {
         std::cerr << SequenceAlignment::USAGE;
         return -1;
@@ -118,6 +126,15 @@ int parseArguments(int argc, const char *argv[])
                                                   (setArg == SequenceAlignment::programArgs::PROTEIN)
                                                   ? setArg
                                                   : SequenceAlignment::sequenceType;
+
+                bool isDna = SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA;
+                SequenceAlignment::alphabet = isDna
+                                              ? SequenceAlignment::DNA_ALPHABET
+                                              : SequenceAlignment::PROTEIN_ALPHABET;
+                SequenceAlignment::alphabetSize = isDna
+                                              ? SequenceAlignment::NUM_DNA_CHARS
+                                              : SequenceAlignment::NUM_PROTEIN_CHARS;
+
                 nextIsScoreMatrixFile = (setArg == SequenceAlignment::programArgs::SCORE_MATRIX);
             }
             else
@@ -131,11 +148,8 @@ int parseArguments(int argc, const char *argv[])
             if (parseScoreMatrixFile(argv[i]) == -1)
             {
                 // Read in defualt scores.
-                std::cerr << SequenceAlignment::SCORE_MATRIX_NOT_READ_WARNING;
-                const auto scoreMatrixFile = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
-                                            ? SequenceAlignment::defaultDnaScoreMatrixFile
-                                            : SequenceAlignment::defaultProteinScoreMatrixFile;
-                parseScoreMatrixFile(scoreMatrixFile);
+                std::cerr << SequenceAlignment::SCORE_MATRIX_NOT_READ_ERROR;
+                return -1;
             }
             nextIsScoreMatrixFile = false;
         }
