@@ -8,7 +8,7 @@
 #include <algorithm>
 
 
-TEST_CASE( "parseArguments")
+TEST_CASE("parseArguments")
 {
     // Catch stderr to string to test error messages.
     std::stringstream buffer;
@@ -55,19 +55,19 @@ TEST_CASE( "parseArguments")
 
     SECTION("correct sequence files")
     {
-            const int argc = 3;
-            const char *argv[argc] = { "./alignSequence", "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
-            parseArguments(argc, argv);
+        const int argc = 3;
+        const char *argv[argc] = { "./alignSequence", "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
+        parseArguments(argc, argv);
 
-            const char expectedText[] = {0, 2, 0, 2, 3, 2, 1, 0, 3};
-            const char expectedPattern[] = {2, 2, 1, 0, 1, 3, 3, 2, 1, 3};
+        const char expectedText[] = {0, 2, 0, 2, 3, 2, 1, 0, 3};
+        const char expectedPattern[] = {2, 2, 1, 0, 1, 3, 3, 2, 1, 3};
 
-            REQUIRE(std::equal(SequenceAlignment::textBytes,
-                            SequenceAlignment::textBytes + SequenceAlignment::textNumBytes,
-                            expectedText));
-            REQUIRE(std::equal(SequenceAlignment::patternBytes,
-                            SequenceAlignment::patternBytes + SequenceAlignment::patternNumBytes,
-                            expectedPattern));
+        REQUIRE(std::equal(SequenceAlignment::textBytes,
+                        SequenceAlignment::textBytes + SequenceAlignment::textNumBytes,
+                        expectedText));
+        REQUIRE(std::equal(SequenceAlignment::patternBytes,
+                        SequenceAlignment::patternBytes + SequenceAlignment::patternNumBytes,
+                        expectedPattern));
     }
 
 
@@ -83,4 +83,18 @@ TEST_CASE( "parseArguments")
         REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('*', '*')] == 1);
     }
 
+}
+
+
+TEST_CASE("alignSequenceCPU")
+{
+    const int argc = 3;
+    const char *argv[argc] = { "./alignSequence", "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
+    parseArguments(argc, argv);
+
+    const std::string expectedAlignment = "CCGCTG";
+    auto gotAlignment = std::string(SequenceAlignment::textBytes,
+                                    SequenceAlignment::textBytes + SequenceAlignment::alignmentNumBytes);
+
+    REQUIRE(expectedAlignment == gotAlignment);
 }

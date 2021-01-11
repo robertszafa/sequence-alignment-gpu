@@ -1,6 +1,8 @@
 #include "SequenceAlignment.hpp"
 #include "utils.hpp"
 
+#include "alignSequenceCPU.cpp"
+
 #include <cuda.h>
 
 #include <iostream>
@@ -11,6 +13,8 @@ int main(int argc, const char *argv[])
 {
     if (parseArguments(argc, argv) == -1) return -1;
 
+    if (SequenceAlignment::deviceType == SequenceAlignment::programArgs::CPU)
+        SequenceAlignment::alignSequenceCPU();
 
     return 0;
 }

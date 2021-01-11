@@ -39,26 +39,40 @@ namespace SequenceAlignment
     const char PROTEIN_ALPHABET[] =  {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M',
                                       'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'B', 'J', 'Z', 'X', '*'};
 
-    const unsigned int MAX_SEQUENCE_LEN = 524288;
+    const unsigned int MAX_SEQUENCE_LEN = 4096;
 
     /// Buffer holding the text sequence.
+    /// It will also hold the aligned sequence.
     char textBytes[MAX_SEQUENCE_LEN];
     /// Buffer holding the pattern sequence.
     char patternBytes[MAX_SEQUENCE_LEN];
     int textNumBytes;
     int patternNumBytes;
+    /// Length of the calculated aligned sequence.
+    int alignmentNumBytes;
+
+    /// Buffer holding the values of the alignment matrix and a trace. Zeroed at start.
+    struct alignPoint {int val = 0; unsigned int prev = 0; unsigned int gapLen = 0; char letter;};
+    alignPoint alignMatrix[MAX_SEQUENCE_LEN * MAX_SEQUENCE_LEN + 2*MAX_SEQUENCE_LEN] = {};
 
     /// Substitution matrix stored in row major order.
     /// To get the score of substituting 'C (2)' for 'G (4)' do scoreMatrix[2*NUM_DNA_CHARS + 4]
-    short scoreMatrix[NUM_PROTEIN_CHARS*NUM_PROTEIN_CHARS];
+    short scoreMatrix[NUM_PROTEIN_CHARS * NUM_PROTEIN_CHARS];
 
     /// Default program arguments. Can be changed with the appropriate flags.
     int deviceType = programArgs::CPU;
     int sequenceType = programArgs::DNA;
     const char *alphabet = DNA_ALPHABET;
     int alphabetSize = NUM_DNA_CHARS;
+    int affineGapScore = 0;
 
     const std::string defaultDnaScoreMatrixFile = "scoreMatrices/dna/blast.txt";
     const std::string defaultProteinScoreMatrixFile = "scoreMatrices/protein/blosum50.txt";
+
+    void alignSequenceCPU();
+    void alignSequenceGPU();
+
+    /// Using the matrix of alignPoints, construct the aligned sequence string.
+    void traceBack();
 
 } // namespace SequenceAlignment
