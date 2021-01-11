@@ -8,8 +8,8 @@ TEST_BIN=runTests
 
 all : alignSequence test
 
-alignSequence : alignSequence.cu utils.hpp SequenceAlignment.hpp
-		$(NVCC) $(CXXFLAGS) alignSequence.cu -o $(BIN)
+alignSequence : mainDriver.cu utils.hpp SequenceAlignment.hpp
+		$(NVCC) $(CXXFLAGS) mainDriver.cu -o $(BIN)
 
 test : test/tests.cpp utils.hpp
 		$(NVCC) $(CXXFLAGS) test/tests.cpp -o $(TEST_BIN)
