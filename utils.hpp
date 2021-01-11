@@ -108,6 +108,14 @@ int parseArguments(int argc, const char *argv[])
         return -1;
     }
 
+    // Reset all program parameters to default.
+    SequenceAlignment::deviceType = SequenceAlignment::programArgs::CPU;
+    SequenceAlignment::sequenceType = SequenceAlignment::programArgs::DNA;
+    SequenceAlignment::alphabet = SequenceAlignment::DNA_ALPHABET;
+    SequenceAlignment::alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
+    SequenceAlignment::textNumBytes = 0;
+    SequenceAlignment::patternNumBytes = 0;
+
     bool nextIsScoreMatrixFile = false;
     for (int i = 1; i < argc; ++i)
     {

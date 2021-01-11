@@ -8,7 +8,7 @@
 #include <algorithm>
 
 
-TEST_CASE( "parseArguments - error messages")
+TEST_CASE( "parseArguments")
 {
     // Catch stderr to string to test error messages.
     std::stringstream buffer;
@@ -53,44 +53,34 @@ TEST_CASE( "parseArguments - error messages")
     // Restore old cerr.
     std::cerr.rdbuf(old);
 
+    SECTION("correct sequence files")
+    {
+            const int argc = 3;
+            const char *argv[argc] = { "./alignSequence", "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
+            parseArguments(argc, argv);
+
+            const char expectedText[] = {0, 2, 0, 2, 3, 2, 1, 0, 3};
+            const char expectedPattern[] = {2, 2, 1, 0, 1, 3, 3, 2, 1, 3};
+
+            REQUIRE(std::equal(SequenceAlignment::textBytes,
+                            SequenceAlignment::textBytes + SequenceAlignment::textNumBytes,
+                            expectedText));
+            REQUIRE(std::equal(SequenceAlignment::patternBytes,
+                            SequenceAlignment::patternBytes + SequenceAlignment::patternNumBytes,
+                            expectedPattern));
+    }
+
+
+    SECTION("parseScoreMatrixFile")
+    {
+        SequenceAlignment::alphabet = SequenceAlignment::DNA_ALPHABET;
+        SequenceAlignment::alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
+        parseScoreMatrixFile("scoreMatrices/dna/blast.txt");
+
+        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('A', 'A')] == 5);
+        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('G', 'T')] == -4);
+        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('C', '*')] == -1);
+        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('*', '*')] == 1);
+    }
+
 }
-
-TEST_CASE("validateAndTransform")
-{
-    SequenceAlignment::textNumBytes = 9;
-    SequenceAlignment::patternNumBytes = 10;
-    SequenceAlignment::sequenceType = SequenceAlignment::programArgs::DNA;
-    SequenceAlignment::alphabet = SequenceAlignment::DNA_ALPHABET;
-    SequenceAlignment::alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
-
-    std::ifstream textFile("data/dna/dna_01.txt");
-    std::ifstream patternFile("data/dna/dna_02.txt");
-    std::string textString((std::istreambuf_iterator<char>(textFile)), std::istreambuf_iterator<char>());
-    std::string patternString((std::istreambuf_iterator<char>(patternFile)), std::istreambuf_iterator<char>());
-
-    validateAndTransform(textString, SequenceAlignment::textBytes);
-    validateAndTransform(patternString, SequenceAlignment::patternBytes);
-
-    const char expectedText[] = {0, 2, 0, 2, 3, 2, 1, 0, 3};
-    const char expectedPattern[] = {2, 2, 1, 0, 1, 3, 3, 2, 1, 3};
-
-    REQUIRE(std::equal(SequenceAlignment::textBytes,
-                       SequenceAlignment::textBytes + SequenceAlignment::textNumBytes,
-                       expectedText));
-    REQUIRE(std::equal(SequenceAlignment::patternBytes,
-                        SequenceAlignment::patternBytes + SequenceAlignment::patternNumBytes,
-                        expectedPattern));
-}
-
-TEST_CASE("parseScoreMatrixFile")
-{
-    SequenceAlignment::alphabet = SequenceAlignment::DNA_ALPHABET;
-    SequenceAlignment::alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
-    parseScoreMatrixFile("scoreMatrices/dna/blast.txt");
-
-    REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('A', 'A')] == 5);
-    REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('G', 'T')] == -4);
-    REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('C', '*')] == -1);
-    REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('*', '*')] == 1);
-}
-

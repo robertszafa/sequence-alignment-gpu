@@ -29,18 +29,6 @@ namespace SequenceAlignment
         { 'p', programArgs::PROTEIN},
         { 'm', programArgs::SCORE_MATRIX},
     };
-    /// Default is CPU.
-    int deviceType = programArgs::CPU;
-    /// Default is DNA.
-    int sequenceType = programArgs::DNA;
-
-    const unsigned int MAX_SEQUENCE_LEN = 524288;
-
-    char textBytes[MAX_SEQUENCE_LEN];
-    int textNumBytes = 0;
-
-    char patternBytes[MAX_SEQUENCE_LEN];
-    int patternNumBytes = 0;
 
     /// The empty character is also counted.
     const unsigned int NUM_DNA_CHARS = 5;
@@ -51,14 +39,24 @@ namespace SequenceAlignment
     const char PROTEIN_ALPHABET[] =  {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M',
                                       'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'B', 'J', 'Z', 'X', '*'};
 
-    /// Selected alphabet.
-    const char *alphabet;
-    /// Number of characters in the selected alphabet.
-    int alphabetSize;
+    const unsigned int MAX_SEQUENCE_LEN = 524288;
+
+    /// Buffer holding the text sequence.
+    char textBytes[MAX_SEQUENCE_LEN];
+    /// Buffer holding the pattern sequence.
+    char patternBytes[MAX_SEQUENCE_LEN];
+    int textNumBytes;
+    int patternNumBytes;
 
     /// Substitution matrix stored in row major order.
     /// To get the score of substituting 'C (2)' for 'G (4)' do scoreMatrix[2*NUM_DNA_CHARS + 4]
     short scoreMatrix[NUM_PROTEIN_CHARS*NUM_PROTEIN_CHARS];
+
+    /// Default program arguments. Can be changed with the appropriate flags.
+    int deviceType = programArgs::CPU;
+    int sequenceType = programArgs::DNA;
+    const char *alphabet = DNA_ALPHABET;
+    int alphabetSize = NUM_DNA_CHARS;
 
     const std::string defaultDnaScoreMatrixFile = "scoreMatrices/dna/blast.txt";
     const std::string defaultProteinScoreMatrixFile = "scoreMatrices/protein/blosum50.txt";
