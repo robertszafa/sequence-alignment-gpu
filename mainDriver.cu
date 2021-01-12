@@ -1,8 +1,6 @@
 #include "SequenceAlignment.hpp"
 #include "utils.hpp"
 
-#include "alignSequenceCPU.cpp"
-
 #include <cuda.h>
 
 #include <iostream>

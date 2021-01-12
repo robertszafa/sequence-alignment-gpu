@@ -5,8 +5,6 @@
 #include "../SequenceAlignment.hpp"
 #include "../utils.hpp"
 
-#include <algorithm>
-
 
 TEST_CASE("parseArguments")
 {
@@ -91,6 +89,8 @@ TEST_CASE("alignSequenceCPU")
     const int argc = 3;
     const char *argv[argc] = { "./alignSequence", "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
     parseArguments(argc, argv);
+
+    SequenceAlignment::alignSequenceCPU();
 
     const std::string expectedAlignment = "CCGCTG";
     auto gotAlignment = std::string(SequenceAlignment::textBytes,

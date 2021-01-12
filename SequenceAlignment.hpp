@@ -3,7 +3,6 @@
 #include <string>
 #include <unordered_map>
 
-
 namespace SequenceAlignment
 {
     const std::string USAGE = "Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile patternSequenceFile \
@@ -70,9 +69,13 @@ namespace SequenceAlignment
     const std::string defaultProteinScoreMatrixFile = "scoreMatrices/protein/blosum50.txt";
 
     void alignSequenceCPU();
-    void alignSequenceGPU();
 
     /// Using the matrix of alignPoints, construct the aligned sequence string.
     void traceBack();
 
 } // namespace SequenceAlignment
+
+
+/** X86 implementation files */
+
+#include "alignSequenceCPU.cpp"

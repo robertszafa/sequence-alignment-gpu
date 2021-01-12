@@ -1,12 +1,20 @@
 #include "SequenceAlignment.hpp"
 
+#include <iostream>
 
 void SequenceAlignment::traceBack()
 {
     alignmentNumBytes = 0;
+    int traceIdx = patternNumBytes * textNumBytes;
 
+    while (traceIdx > 0)
+    {
+        textBytes[alignmentNumBytes] = alignMatrix[traceIdx].letter;
+        traceIdx = alignMatrix[traceIdx].prev;
+        ++alignmentNumBytes;
+    }
 
-
+    std::reverse(textBytes, textBytes + alignmentNumBytes);
 }
 
 void SequenceAlignment::alignSequenceCPU()
@@ -18,6 +26,7 @@ void SequenceAlignment::alignSequenceCPU()
     {
         for (int i_pattern = 1; i_pattern <= patternNumBytes; ++i_pattern)
         {
+            // Compute this and neigbour indexes.
             const unsigned int thisAlignIdx = i_text * textNumBytes + i_pattern;
             const unsigned int leftAlignIdx = thisAlignIdx - 1;
             const unsigned int topAlignIdx = thisAlignIdx - textNumBytes;
@@ -28,19 +37,20 @@ void SequenceAlignment::alignSequenceCPU()
             const char patternByte = patternBytes[i_pattern - 1];
             const int scoreMatrixIdx = ((int)textByte) * SequenceAlignment::alphabetSize + ((int)patternByte);
 
-            // Calculate 3 possible alignment scores.
-            const int equalScore = alignMatrix[diagonalAlignIdx].val + scoreMatrix[scoreMatrixIdx];
+            // Calculate all neoghbour alignment scores.
+            const int fromDiagonalScore = alignMatrix[diagonalAlignIdx].val + scoreMatrix[scoreMatrixIdx];
             const int fromAboveScore = alignMatrix[topAlignIdx].val + gapScore +
                                        affineGapScore * (alignMatrix[topAlignIdx].gapLen + 1);
             const int fromLeftScore = alignMatrix[leftAlignIdx].val + gapScore +
                                       affineGapScore * (alignMatrix[leftAlignIdx].gapLen + 1);
 
-            // Select the best alignment and populate this alignPoint struct.
-            const bool isFromDiagonal = equalScore >= std::max(fromLeftScore, fromAboveScore);
+            // Find out the best alignment.
+            const bool isFromDiagonal = fromDiagonalScore >= std::max(fromLeftScore, fromAboveScore);
             const bool isFromLeft = !(isFromDiagonal) && fromLeftScore >= fromAboveScore;
             const bool isFromAbove = !(isFromDiagonal) && !(isFromLeft);
 
-            alignMatrix[thisAlignIdx].val = std::max(equalScore, std::max(fromLeftScore, fromAboveScore));
+            // Populate this alignPoint with the best alignment.
+            alignMatrix[thisAlignIdx].val = std::max(fromDiagonalScore, std::max(fromLeftScore, fromAboveScore));
             alignMatrix[thisAlignIdx].prev = isFromDiagonal * diagonalAlignIdx +
                                              isFromLeft * leftAlignIdx +
                                              isFromAbove * leftAlignIdx;
@@ -51,4 +61,6 @@ void SequenceAlignment::alignSequenceCPU()
             alignMatrix[thisAlignIdx].letter = (!isFromDiagonal) * gapByte + isFromDiagonal * textByte;
         }
     }
+
+    traceBack();
 }
