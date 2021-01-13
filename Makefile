@@ -1,6 +1,6 @@
 NVCC=nvcc
 CXX=clang++
-CXXFLAGS=-std=c++14
+CXXFLAGS=-std=c++14 #-O3
 
 BIN=alignSequence
 TEST_BIN=runTests
