@@ -74,8 +74,8 @@ TEST_CASE("parseArguments")
         SequenceAlignment::alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
         parseScoreMatrixFile("scoreMatrices/dna/blast.txt");
 
-        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('A', 'A')] == 5);
-        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('G', 'T')] == -4);
+        REQUIRE(SequenceAlignment::scoreMatrix[getScore('A', 'A')] == 5);
+        REQUIRE(SequenceAlignment::scoreMatrix[getScore('G', 'T')] == -4);
     }
 
 }

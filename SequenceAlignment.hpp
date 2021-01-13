@@ -55,23 +55,25 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     const char PROTEIN_ALPHABET[] =  {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K',
                                       'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'B', 'J', 'Z', 'X'};
 
+    const unsigned int MAX_SEQUENCE_LEN = 4096;
+
     /// Default program arguments.
-    const int DEFAULT_DEVICE = programArgs::CPU;
-    const int DEFAULT_SEQUENCE = programArgs::DNA;
-    const char *DEFAULT_ALPHABET = DNA_ALPHABET;
+    const programArgs DEFAULT_DEVICE = programArgs::CPU;
+    const programArgs DEFAULT_SEQUENCE = programArgs::DNA;
+    static const char *DEFAULT_ALPHABET = DNA_ALPHABET;
     const int DEFAULT_ALPHABET_SIZE = NUM_DNA_CHARS;
     const short DEFAULT_GAP_OPEN = 10;
     const short DEFAULT_GAP_EXTEND = 1;
     const std::string DEFAULT_DNA_SCORE_MATRIX_FILE = "scoreMatrices/dna/blast.txt";
     const std::string DEFAULT_PROTEIN_SCORE_MATRIX_FILE = "scoreMatrices/protein/blosum50.txt";
 
-    int deviceType;
-    int sequenceType;
-
-    const unsigned int MAX_SEQUENCE_LEN = 4096;
 
     struct Request
     {
+        /// Which device should be used for the request.
+        programArgs deviceType;
+        /// What is the type of the sequences.
+        programArgs sequenceType;
         /// Buffer holding the text sequence.
         char textBytes[MAX_SEQUENCE_LEN]; int textNumBytes;
         /// Buffer holding the pattern sequence.
@@ -100,5 +102,5 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
 
 /** X86 implementation files */
 
-#include "alignSequenceCPU.cpp"
-#include "utils.cpp"
+// #include "alignSequenceCPU.cpp"
+// #include "utils.cpp"
