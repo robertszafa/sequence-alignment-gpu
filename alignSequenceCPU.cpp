@@ -2,66 +2,70 @@
 
 #include <iostream>
 
-void SequenceAlignment::traceBack()
+// void traceBack()
+// {
+//     alignmentNumBytes = 0;
+//     int traceIdx = patternNumBytes * textNumBytes;
+
+//     while (traceIdx > 1)
+//     {
+//         // Get back actual letter.
+//         textBytes[alignmentNumBytes] = alphabet[alignMatrix[traceIdx].letter];
+//         traceIdx = alignMatrix[traceIdx].prev;
+//         ++alignmentNumBytes;
+//     }
+
+//     std::reverse(textBytes, textBytes + alignmentNumBytes);
+// }
+
+void SequenceAlignment::alignSequenceCPU(const Request &request, Response *response)
 {
-    alignmentNumBytes = 0;
-    int traceIdx = patternNumBytes * textNumBytes;
+    // /// Buffer holding the values of the alignment matrix and a trace. Zeroed at start.
+    // struct alignPoint {int val = 0; unsigned int prev = 0; unsigned int gapLen = 0; char letter;};
+    // alignPoint alignMatrix[MAX_SEQUENCE_LEN * MAX_SEQUENCE_LEN + 2*MAX_SEQUENCE_LEN] = {};
 
-    while (traceIdx > 1)
-    {
-        // Get back actual letter.
-        textBytes[alignmentNumBytes] = alphabet[alignMatrix[traceIdx].letter];
-        traceIdx = alignMatrix[traceIdx].prev;
-        ++alignmentNumBytes;
-    }
+    // const char gapByte = alphabetSize - 1;
+    // const short gapScore = scoreMatrix[alphabetSize * alphabetSize - 1];
 
-    std::reverse(textBytes, textBytes + alignmentNumBytes);
-}
+    // for (int i_text = 1; i_text <= textNumBytes; ++i_text)
+    // {
+    //     for (int i_pattern = 1; i_pattern <= patternNumBytes; ++i_pattern)
+    //     {
+    //         // Compute this and neigbour indexes.
+    //         const unsigned int thisAlignIdx = i_text * patternNumBytes + i_pattern;
+    //         const unsigned int leftAlignIdx = thisAlignIdx - 1;
+    //         const unsigned int topAlignIdx = thisAlignIdx - textNumBytes;
+    //         const unsigned int diagonalAlignIdx = thisAlignIdx - textNumBytes - 1;
 
-void SequenceAlignment::alignSequenceCPU()
-{
-    const char gapByte = alphabetSize - 1;
-    const short gapScore = scoreMatrix[alphabetSize * alphabetSize - 1];
+    //         // Get score for this letter combination.
+    //         const char textByte = textBytes[i_text - 1];
+    //         const char patternByte = patternBytes[i_pattern - 1];
+    //         const int scoreMatrixIdx = ((int)textByte) * SequenceAlignment::alphabetSize + ((int)patternByte);
 
-    for (int i_text = 1; i_text <= textNumBytes; ++i_text)
-    {
-        for (int i_pattern = 1; i_pattern <= patternNumBytes; ++i_pattern)
-        {
-            // Compute this and neigbour indexes.
-            const unsigned int thisAlignIdx = i_text * patternNumBytes + i_pattern;
-            const unsigned int leftAlignIdx = thisAlignIdx - 1;
-            const unsigned int topAlignIdx = thisAlignIdx - textNumBytes;
-            const unsigned int diagonalAlignIdx = thisAlignIdx - textNumBytes - 1;
+    //         // Calculate all neoghbour alignment scores.
+    //         const int fromDiagonalScore = alignMatrix[diagonalAlignIdx].val + scoreMatrix[scoreMatrixIdx];
+    //         const int fromAboveScore = alignMatrix[topAlignIdx].val + gapScore +
+    //                                    gapExtend * (alignMatrix[topAlignIdx].gapLen + 1);
+    //         const int fromLeftScore = alignMatrix[leftAlignIdx].val + gapScore +
+    //                                   gapExtend * (alignMatrix[leftAlignIdx].gapLen + 1);
 
-            // Get score for this letter combination.
-            const char textByte = textBytes[i_text - 1];
-            const char patternByte = patternBytes[i_pattern - 1];
-            const int scoreMatrixIdx = ((int)textByte) * SequenceAlignment::alphabetSize + ((int)patternByte);
+    //         // Find out the best alignment.
+    //         const bool isFromDiagonal = fromDiagonalScore >= std::max(fromLeftScore, fromAboveScore);
+    //         const bool isFromLeft = !(isFromDiagonal) && fromLeftScore >= fromAboveScore;
+    //         const bool isFromAbove = !(isFromDiagonal) && !(isFromLeft);
 
-            // Calculate all neoghbour alignment scores.
-            const int fromDiagonalScore = alignMatrix[diagonalAlignIdx].val + scoreMatrix[scoreMatrixIdx];
-            const int fromAboveScore = alignMatrix[topAlignIdx].val + gapScore +
-                                       gapExtend * (alignMatrix[topAlignIdx].gapLen + 1);
-            const int fromLeftScore = alignMatrix[leftAlignIdx].val + gapScore +
-                                      gapExtend * (alignMatrix[leftAlignIdx].gapLen + 1);
+    //         // Populate this alignPoint with the best alignment.
+    //         alignMatrix[thisAlignIdx].val = std::max(fromDiagonalScore, std::max(fromLeftScore, fromAboveScore));
+    //         alignMatrix[thisAlignIdx].prev = isFromDiagonal * diagonalAlignIdx +
+    //                                          isFromLeft * leftAlignIdx +
+    //                                          isFromAbove * leftAlignIdx;
+    //         // gapLen will be 0 if we align from the diagonal.
+    //         alignMatrix[thisAlignIdx].gapLen = isFromLeft * (alignMatrix[fromLeftScore].gapLen + 1) +
+    //                                            isFromAbove * (alignMatrix[fromAboveScore].gapLen + 1);
 
-            // Find out the best alignment.
-            const bool isFromDiagonal = fromDiagonalScore >= std::max(fromLeftScore, fromAboveScore);
-            const bool isFromLeft = !(isFromDiagonal) && fromLeftScore >= fromAboveScore;
-            const bool isFromAbove = !(isFromDiagonal) && !(isFromLeft);
+    //         alignMatrix[thisAlignIdx].letter = (!isFromDiagonal) * gapByte + isFromDiagonal * textByte;
+    //     }
+    // }
 
-            // Populate this alignPoint with the best alignment.
-            alignMatrix[thisAlignIdx].val = std::max(fromDiagonalScore, std::max(fromLeftScore, fromAboveScore));
-            alignMatrix[thisAlignIdx].prev = isFromDiagonal * diagonalAlignIdx +
-                                             isFromLeft * leftAlignIdx +
-                                             isFromAbove * leftAlignIdx;
-            // gapLen will be 0 if we align from the diagonal.
-            alignMatrix[thisAlignIdx].gapLen = isFromLeft * (alignMatrix[fromLeftScore].gapLen + 1) +
-                                               isFromAbove * (alignMatrix[fromAboveScore].gapLen + 1);
-
-            alignMatrix[thisAlignIdx].letter = (!isFromDiagonal) * gapByte + isFromDiagonal * textByte;
-        }
-    }
-
-    traceBack();
+    // // traceBack();
 }

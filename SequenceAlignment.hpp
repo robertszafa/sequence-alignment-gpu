@@ -47,7 +47,6 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     const std::string GAP_EXTEND_NOT_READ_ERROR =
         "Error: gap extend penalty not read. Only integer scores accepted (-32,768 to 32,767)\n";
 
-    /// The empty character is also counted.
     const unsigned int NUM_DNA_CHARS = 4;
     const unsigned int NUM_PROTEIN_CHARS = 24;
     /// The order of scores in a file with a scoring matrix is fixed ('*' represents a gap).
@@ -66,37 +65,35 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     const std::string DEFAULT_DNA_SCORE_MATRIX_FILE = "scoreMatrices/dna/blast.txt";
     const std::string DEFAULT_PROTEIN_SCORE_MATRIX_FILE = "scoreMatrices/protein/blosum50.txt";
 
+    int deviceType;
+    int sequenceType;
 
     const unsigned int MAX_SEQUENCE_LEN = 4096;
 
-    /// Buffer holding the text sequence.
-    char textBytes[MAX_SEQUENCE_LEN];
-    /// Buffer holding the pattern sequence.
-    char patternBytes[MAX_SEQUENCE_LEN];
-    int textNumBytes;
-    int patternNumBytes;
-    /// Length of the calculated aligned sequence.
-    int alignmentNumBytes;
+    struct Request
+    {
+        /// Buffer holding the text sequence.
+        char textBytes[MAX_SEQUENCE_LEN]; int textNumBytes;
+        /// Buffer holding the pattern sequence.
+        char patternBytes[MAX_SEQUENCE_LEN]; int patternNumBytes;
+        /// Alphabet of the sequence.
+        const char *alphabet; int alphabetSize;
+        /// Substitution matrix stored in row major order.
+        short scoreMatrix[NUM_PROTEIN_CHARS * NUM_PROTEIN_CHARS];
+        /// Penalties for opening and extending gaps.
+        short gapOpen; short gapExtend;
+    };
 
-    /// Buffer holding the values of the alignment matrix and a trace. Zeroed at start.
-    struct alignPoint {int val = 0; unsigned int prev = 0; unsigned int gapLen = 0; char letter;};
-    alignPoint alignMatrix[MAX_SEQUENCE_LEN * MAX_SEQUENCE_LEN + 2*MAX_SEQUENCE_LEN] = {};
-
-    /// Substitution matrix stored in row major order.
-    /// To get the score of substituting 'C (2)' for 'G (4)' do scoreMatrix[2*NUM_DNA_CHARS + 4]
-    short scoreMatrix[NUM_PROTEIN_CHARS * NUM_PROTEIN_CHARS];
-
-    int deviceType;
-    int sequenceType;
-    const char *alphabet;
-    int alphabetSize;
-    short gapOpen;
-    short gapExtend;
+    struct Response
+    {
+        /// Buffer holding the aligned text sequence.
+        char alignedTextBytes[MAX_SEQUENCE_LEN]; int alignedTextNumBytes;
+        /// Buffer holding the aligned pattern sequence.
+        char alignedPatternBytes[MAX_SEQUENCE_LEN]; int alignedPatternNumBytes;
+    };
 
 
-    void alignSequenceCPU();
-    /// Using the matrix of alignPoints, construct the aligned sequence string.
-    void traceBack();
+    void alignSequenceCPU(const Request&, Response*);
 
 } // namespace SequenceAlignment
 

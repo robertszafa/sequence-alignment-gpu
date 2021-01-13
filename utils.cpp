@@ -6,30 +6,33 @@
 #include <algorithm>
 #include <fstream>
 
-/// Given a letter from the dna or protein alphabet return the index of that letter
-/// in the ordered alphabet array.
-char letterToInt(char letter)
+/// Given a letter and an alphabet array,
+/// return the index of that letter in the  alphabet array.
+char indedOfLetter(const char letter, const char *alphabet, const int alphabetSize)
 {
-    auto letterItr = std::find(SequenceAlignment::alphabet,
-                               SequenceAlignment::alphabet + SequenceAlignment::alphabetSize,
-                               letter);
-    if (letterItr == (SequenceAlignment::alphabet + SequenceAlignment::alphabetSize)) return -1;
-
-    return std::distance(SequenceAlignment::alphabet, letterItr);
+    auto letterItr = std::find(alphabet, alphabet + alphabetSize, letter);
+    if (letterItr == (alphabet + alphabetSize)) return -1;
+    return std::distance(alphabet, letterItr);
 }
 
-int getScoreIndex(char char1, char char2)
+/// Given two characters, an alphabet and a scoring matrix,
+/// return the score of the character combination.
+int getScore(char char1, char char2, const char *alphabet, const int alphabetSize,
+             const short *scoreMatrix)
 {
-    return letterToInt(char1) * SequenceAlignment::alphabetSize + letterToInt(char2);
+    int idx = indedOfLetter(char1, alphabet, alphabetSize) * alphabetSize +
+              indedOfLetter(char2, alphabet, alphabetSize);
+    return scoreMatrix[idx];
 }
 
-int validateAndTransform(const std::string &sequence, char *dstBuffer)
+int validateAndTransform(const std::string &sequence, const char *alphabet, const int alphabetSize,
+                         char *dstBuffer)
 {
     for (int i=0; i<sequence.length(); ++i)
     {
         const char upperLetter = (sequence[i] > 90) ? sequence[i] - 32 : sequence[i];
 
-        dstBuffer[i] = letterToInt(upperLetter);
+        dstBuffer[i] = indedOfLetter(upperLetter, alphabet, alphabetSize);
         if (dstBuffer[i] == -1)
         {
             std::cerr << "'" << sequence[i] << "'" << " letter not in alphabet." << std::endl;
@@ -41,31 +44,18 @@ int validateAndTransform(const std::string &sequence, char *dstBuffer)
 }
 
 /// Given a filename, copy the chars (bytes) from the file into a buffer.
-/// If the text sequence buffer is empty, it is filled.
-/// Else if the pattern sequence buffer is empty, it is filled.
-/// Else the file is ignored.
-int readSequenceBytes(const std::string fname)
+/// Return the number of bytes read or -1 if an error occured.
+int readSequenceBytes(const std::string fname,  const char *alphabet, const int alphabetSize,
+                      char *dstBuffer)
 {
     std::ifstream f(fname);
+    int numBytesRead = 0;
     if (f.good())
     {
         // Use string's range constructor to copy over entire file to memory.
         std::string fileString((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-
-        if (SequenceAlignment::textNumBytes == 0)
-        {
-            SequenceAlignment::textNumBytes = fileString.length();
-            if (validateAndTransform(fileString, SequenceAlignment::textBytes) == -1) return -1;
-        }
-        else if (SequenceAlignment::patternNumBytes == 0)
-        {
-            SequenceAlignment::patternNumBytes = fileString.length();
-            if (validateAndTransform(fileString, SequenceAlignment::patternBytes) == -1) return -1;
-        }
-        else
-        {
-            std::cerr << "Ignoring file " << fname << std::endl;
-        }
+        if (validateAndTransform(fileString, alphabet, alphabetSize, dstBuffer) == -1) return -1;
+        numBytesRead = fileString.length();
     }
     else
     {
@@ -73,23 +63,23 @@ int readSequenceBytes(const std::string fname)
         return -1;
     }
 
-    return 0;
+    return numBytesRead;
 }
 
-int parseScoreMatrixFile(const std::string fname)
+int parseScoreMatrixFile(const std::string& fname, const int alphabetSize, short *buffer)
 {
     std::ifstream f(fname);
     if (f.good())
     {
         short nextScore;
-        for (int i=0; i<SequenceAlignment::alphabetSize; ++i)
+        for (int i = 0; i < alphabetSize; ++i)
         {
-            for (int j=0; j<SequenceAlignment::alphabetSize; ++j)
+            for (int j = 0; j < alphabetSize; ++j)
             {
                 // Check if 16-bit number.
                 if (!(f >> nextScore)) return -1;
 
-                SequenceAlignment::scoreMatrix[i * SequenceAlignment::alphabetSize + j] = nextScore;
+                buffer[i*alphabetSize + j] = nextScore;
             }
         }
     }
@@ -101,7 +91,7 @@ int parseScoreMatrixFile(const std::string fname)
     return 0;
 }
 
-int parseArguments(int argc, const char *argv[])
+int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *request)
 {
     // We need at least the text and pattern file.
     if (argc == 1)
@@ -110,15 +100,15 @@ int parseArguments(int argc, const char *argv[])
         return -1;
     }
 
-    // Set all program parameters to default.
+    // Set all to default.
     SequenceAlignment::deviceType = SequenceAlignment::DEFAULT_DEVICE;
     SequenceAlignment::sequenceType = SequenceAlignment::DEFAULT_SEQUENCE;
-    SequenceAlignment::alphabet = SequenceAlignment::DEFAULT_ALPHABET;
-    SequenceAlignment::alphabetSize = SequenceAlignment::DEFAULT_ALPHABET_SIZE;
-    SequenceAlignment::gapOpen = SequenceAlignment::DEFAULT_GAP_OPEN;
-    SequenceAlignment::gapExtend = SequenceAlignment::DEFAULT_GAP_EXTEND;
-    SequenceAlignment::textNumBytes = 0;
-    SequenceAlignment::patternNumBytes = 0;
+    request->alphabet = SequenceAlignment::DEFAULT_ALPHABET;
+    request->alphabetSize = SequenceAlignment::DEFAULT_ALPHABET_SIZE;
+    request->gapOpen = SequenceAlignment::DEFAULT_GAP_OPEN;
+    request->gapExtend = SequenceAlignment::DEFAULT_GAP_EXTEND;
+    request->textNumBytes = 0;
+    request->patternNumBytes = 0;
 
     enum flagState {NOT_READ, TO_READ, READ};
     flagState scoreMatrixState = flagState::NOT_READ;
@@ -141,9 +131,9 @@ int parseArguments(int argc, const char *argv[])
                                               : SequenceAlignment::sequenceType;
 
             bool isDna = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA);
-            SequenceAlignment::alphabet = isDna ? SequenceAlignment::DNA_ALPHABET
+            request->alphabet = isDna ? SequenceAlignment::DNA_ALPHABET
                                                 : SequenceAlignment::PROTEIN_ALPHABET;
-            SequenceAlignment::alphabetSize = isDna ? SequenceAlignment::NUM_DNA_CHARS
+            request->alphabetSize = isDna ? SequenceAlignment::NUM_DNA_CHARS
                                                     : SequenceAlignment::NUM_PROTEIN_CHARS;
 
             scoreMatrixState = (setArg == SequenceAlignment::programArgs::SCORE_MATRIX)
@@ -160,7 +150,7 @@ int parseArguments(int argc, const char *argv[])
         {
             try
             {
-                SequenceAlignment::gapOpen = std::stoi(argv[i]);
+                request->gapOpen = std::stoi(argv[i]);
             }
             catch (...) // std::invalid_argument, std::out_of_range
             {
@@ -173,7 +163,7 @@ int parseArguments(int argc, const char *argv[])
         {
             try
             {
-                SequenceAlignment::gapExtend = std::stoi(argv[i]);
+                request->gapExtend = std::stoi(argv[i]);
             }
             catch (...) // std::invalid_argument, std::out_of_range
             {
@@ -185,7 +175,7 @@ int parseArguments(int argc, const char *argv[])
         // Files to read
         else if (scoreMatrixState == flagState::TO_READ)
         {
-            if (parseScoreMatrixFile(argv[i]) == -1)
+            if (parseScoreMatrixFile(argv[i], request->alphabetSize, request->scoreMatrix) == -1)
             {
                 std::cerr << SequenceAlignment::SCORE_MATRIX_NOT_READ_ERROR;
                 return -1;
@@ -194,7 +184,15 @@ int parseArguments(int argc, const char *argv[])
         }
         else
         {
-            if (readSequenceBytes(argv[i]) == -1)
+            if (request->textNumBytes == 0)
+                request->textNumBytes = readSequenceBytes(argv[i], request->alphabet,
+                                                          request->alphabetSize, request->textBytes);
+            else if (request->patternNumBytes == 0)
+                request->patternNumBytes = readSequenceBytes(argv[i], request->alphabet,
+                                                          request->alphabetSize, request->patternBytes);
+
+            // Check if read correctly.
+            if (request->textNumBytes == -1 || request->patternNumBytes == -1)
             {
                 std::cerr << SequenceAlignment::SEQ_NOT_READ_ERROR << SequenceAlignment::USAGE;
                 return -1;
@@ -202,7 +200,7 @@ int parseArguments(int argc, const char *argv[])
         }
     }
 
-    if (SequenceAlignment::textNumBytes == 0 || SequenceAlignment::patternNumBytes == 0)
+    if (request->textNumBytes == 0 || request->patternNumBytes == 0)
     {
         std::cerr << SequenceAlignment::SEQ_NOT_READ_ERROR << SequenceAlignment::USAGE;
         return -1;
@@ -213,7 +211,7 @@ int parseArguments(int argc, const char *argv[])
         auto defaultScores = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
                              ? SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE
                              : SequenceAlignment::DEFAULT_PROTEIN_SCORE_MATRIX_FILE;
-        parseScoreMatrixFile(defaultScores);
+        parseScoreMatrixFile(defaultScores, request->alphabetSize, request->scoreMatrix);
     }
 
     return 0;
