@@ -7,9 +7,10 @@ void SequenceAlignment::traceBack()
     alignmentNumBytes = 0;
     int traceIdx = patternNumBytes * textNumBytes;
 
-    while (traceIdx > 0)
+    while (traceIdx > 1)
     {
-        textBytes[alignmentNumBytes] = alignMatrix[traceIdx].letter;
+        // Get back actual letter.
+        textBytes[alignmentNumBytes] = alphabet[alignMatrix[traceIdx].letter];
         traceIdx = alignMatrix[traceIdx].prev;
         ++alignmentNumBytes;
     }
@@ -19,15 +20,15 @@ void SequenceAlignment::traceBack()
 
 void SequenceAlignment::alignSequenceCPU()
 {
-    const char gapByte = alphabetSize * alphabetSize - 1;
-    const short gapScore = scoreMatrix[gapByte];
+    const char gapByte = alphabetSize - 1;
+    const short gapScore = scoreMatrix[alphabetSize * alphabetSize - 1];
 
     for (int i_text = 1; i_text <= textNumBytes; ++i_text)
     {
         for (int i_pattern = 1; i_pattern <= patternNumBytes; ++i_pattern)
         {
             // Compute this and neigbour indexes.
-            const unsigned int thisAlignIdx = i_text * textNumBytes + i_pattern;
+            const unsigned int thisAlignIdx = i_text * patternNumBytes + i_pattern;
             const unsigned int leftAlignIdx = thisAlignIdx - 1;
             const unsigned int topAlignIdx = thisAlignIdx - textNumBytes;
             const unsigned int diagonalAlignIdx = thisAlignIdx - textNumBytes - 1;
@@ -40,9 +41,9 @@ void SequenceAlignment::alignSequenceCPU()
             // Calculate all neoghbour alignment scores.
             const int fromDiagonalScore = alignMatrix[diagonalAlignIdx].val + scoreMatrix[scoreMatrixIdx];
             const int fromAboveScore = alignMatrix[topAlignIdx].val + gapScore +
-                                       affineGapScore * (alignMatrix[topAlignIdx].gapLen + 1);
+                                       gapExtend * (alignMatrix[topAlignIdx].gapLen + 1);
             const int fromLeftScore = alignMatrix[leftAlignIdx].val + gapScore +
-                                      affineGapScore * (alignMatrix[leftAlignIdx].gapLen + 1);
+                                      gapExtend * (alignMatrix[leftAlignIdx].gapLen + 1);
 
             // Find out the best alignment.
             const bool isFromDiagonal = fromDiagonalScore >= std::max(fromLeftScore, fromAboveScore);

@@ -110,58 +110,87 @@ int parseArguments(int argc, const char *argv[])
         return -1;
     }
 
-    // Reset all program parameters to default.
-    SequenceAlignment::deviceType = SequenceAlignment::programArgs::CPU;
-    SequenceAlignment::sequenceType = SequenceAlignment::programArgs::DNA;
-    SequenceAlignment::alphabet = SequenceAlignment::DNA_ALPHABET;
-    SequenceAlignment::alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
+    // Set all program parameters to default.
+    SequenceAlignment::deviceType = SequenceAlignment::DEFAULT_DEVICE;
+    SequenceAlignment::sequenceType = SequenceAlignment::DEFAULT_SEQUENCE;
+    SequenceAlignment::alphabet = SequenceAlignment::DEFAULT_ALPHABET;
+    SequenceAlignment::alphabetSize = SequenceAlignment::DEFAULT_ALPHABET_SIZE;
+    SequenceAlignment::gapOpen = SequenceAlignment::DEFAULT_GAP_OPEN;
+    SequenceAlignment::gapExtend = SequenceAlignment::DEFAULT_GAP_EXTEND;
     SequenceAlignment::textNumBytes = 0;
     SequenceAlignment::patternNumBytes = 0;
 
-    bool nextIsScoreMatrixFile = false;
+    enum flagState {NOT_READ, TO_READ, READ};
+    flagState scoreMatrixState = flagState::NOT_READ;
+    flagState gapOpenState = flagState::NOT_READ;
+    flagState gapExtendState = flagState::NOT_READ;
     for (int i = 1; i < argc; ++i)
     {
-        // Flags
-        if (argv[i][0] == '-' && strlen(argv[i]) > 1)
+        // Check if it's a flag.
+        if (SequenceAlignment::argumentMap.count(argv[i]) > 0)
         {
-            // Check if the flag is valid.
-            if (SequenceAlignment::argumentMap.count(argv[i][1]) > 0)
-            {
-                auto setArg = SequenceAlignment::argumentMap.at(argv[i][1]);
-                SequenceAlignment::deviceType = (setArg == SequenceAlignment::programArgs::CPU) ||
-                                                (setArg == SequenceAlignment::programArgs::GPU)
-                                                ? setArg
-                                                : SequenceAlignment::deviceType;
-                SequenceAlignment::sequenceType = (setArg == SequenceAlignment::programArgs::DNA) ||
-                                                  (setArg == SequenceAlignment::programArgs::PROTEIN)
-                                                  ? setArg
-                                                  : SequenceAlignment::sequenceType;
+            auto setArg = SequenceAlignment::argumentMap.at(argv[i]);
 
-                bool isDna = SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA;
-                SequenceAlignment::alphabet = isDna
-                                              ? SequenceAlignment::DNA_ALPHABET
-                                              : SequenceAlignment::PROTEIN_ALPHABET;
-                SequenceAlignment::alphabetSize = isDna
-                                              ? SequenceAlignment::NUM_DNA_CHARS
-                                              : SequenceAlignment::NUM_PROTEIN_CHARS;
+            SequenceAlignment::deviceType = (setArg == SequenceAlignment::programArgs::CPU ||
+                                             setArg == SequenceAlignment::programArgs::GPU)
+                                            ? setArg
+                                            : SequenceAlignment::deviceType;
+            SequenceAlignment::sequenceType = (setArg == SequenceAlignment::programArgs::DNA ||
+                                               setArg == SequenceAlignment::programArgs::PROTEIN)
+                                              ? setArg
+                                              : SequenceAlignment::sequenceType;
 
-                nextIsScoreMatrixFile = (setArg == SequenceAlignment::programArgs::SCORE_MATRIX);
-            }
-            else
+            bool isDna = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA);
+            SequenceAlignment::alphabet = isDna ? SequenceAlignment::DNA_ALPHABET
+                                                : SequenceAlignment::PROTEIN_ALPHABET;
+            SequenceAlignment::alphabetSize = isDna ? SequenceAlignment::NUM_DNA_CHARS
+                                                    : SequenceAlignment::NUM_PROTEIN_CHARS;
+
+            scoreMatrixState = (setArg == SequenceAlignment::programArgs::SCORE_MATRIX)
+                               ? flagState::TO_READ
+                               : scoreMatrixState;
+            gapOpenState = (setArg == SequenceAlignment::programArgs::GAP_OPEN)
+                           ? flagState::TO_READ
+                           : gapOpenState;
+            gapExtendState = (setArg == SequenceAlignment::programArgs::GAP_EXTEND)
+                             ? flagState::TO_READ
+                             : gapExtendState;
+        }
+        else if (gapOpenState == flagState::TO_READ)
+        {
+            try
             {
-                std::cerr << "Ignoring \"" << argv[i] << "\"" << std::endl;
+                SequenceAlignment::gapOpen = std::stoi(argv[i]);
             }
+            catch (...) // std::invalid_argument, std::out_of_range
+            {
+                std::cerr << SequenceAlignment::GAP_OPEN_NOT_READ_ERROR;
+                return -1;
+            }
+            gapOpenState = flagState::READ;
+        }
+        else if (gapExtendState == flagState::TO_READ)
+        {
+            try
+            {
+                SequenceAlignment::gapExtend = std::stoi(argv[i]);
+            }
+            catch (...) // std::invalid_argument, std::out_of_range
+            {
+                std::cerr << SequenceAlignment::GAP_EXTEND_NOT_READ_ERROR;
+                return -1;
+            }
+            gapExtendState = flagState::READ;
         }
         // Files to read
-        else if (nextIsScoreMatrixFile)
+        else if (scoreMatrixState == flagState::TO_READ)
         {
             if (parseScoreMatrixFile(argv[i]) == -1)
             {
-                // Read in defualt scores.
                 std::cerr << SequenceAlignment::SCORE_MATRIX_NOT_READ_ERROR;
                 return -1;
             }
-            nextIsScoreMatrixFile = false;
+            scoreMatrixState = flagState::READ;
         }
         else
         {
@@ -179,6 +208,13 @@ int parseArguments(int argc, const char *argv[])
         return -1;
     }
 
+    if (scoreMatrixState != flagState::READ)
+    {
+        auto defaultScores = (SequenceAlignment::sequenceType == SequenceAlignment::programArgs::DNA)
+                             ? SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE
+                             : SequenceAlignment::DEFAULT_PROTEIN_SCORE_MATRIX_FILE;
+        parseScoreMatrixFile(defaultScores);
+    }
 
     return 0;
 }

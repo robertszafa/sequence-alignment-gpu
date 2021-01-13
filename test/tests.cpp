@@ -3,7 +3,6 @@
 #include "catch.hpp"
 
 #include "../SequenceAlignment.hpp"
-#include "../utils.hpp"
 
 
 TEST_CASE("parseArguments")
@@ -39,7 +38,7 @@ TEST_CASE("parseArguments")
     SECTION("incorrect score matrix")
     {
         const int argc = 5;
-        const char *argv[argc] = { "./alignSequence", "-m", "test/corruptScoreMatrix.txt",
+        const char *argv[argc] = { "./alignSequence", "--score-matrix", "test/corruptScoreMatrix.txt",
                                    "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
         parseArguments(argc, argv);
 
@@ -77,8 +76,6 @@ TEST_CASE("parseArguments")
 
         REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('A', 'A')] == 5);
         REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('G', 'T')] == -4);
-        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('C', '*')] == -1);
-        REQUIRE(SequenceAlignment::scoreMatrix[getScoreIndex('*', '*')] == 1);
     }
 
 }
