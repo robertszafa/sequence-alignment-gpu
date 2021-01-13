@@ -1,4 +1,4 @@
-#pragma once
+#include "SequenceAlignment.hpp"
 
 #include <iostream>
 #include <algorithm>

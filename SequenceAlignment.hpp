@@ -39,13 +39,13 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
        --gap-open            - next argument is a gap open penalty (default 10)\n\
        --gap-extend          - next argument is a gap extend penalty (default 1)\n";
     const std::string SEQ_NOT_READ_ERROR =
-        "Error: text sequence or pattern sequence not read.\n";
+        "error: text sequence or pattern sequence not read.\n";
     const std::string SCORE_MATRIX_NOT_READ_ERROR =
-        "Error: matrix scores not read. Only integer scores accepted (-32,768 to 32,767)\n";
+        "error: matrix scores not read. Only integer scores accepted (-32,768 to 32,767)\n";
     const std::string GAP_OPEN_NOT_READ_ERROR =
-        "Error: gap penalty not read. Only integer scores accepted (-32,768 to 32,767)\n";
+        "error: gap penalty not read. Only integer scores accepted (-32,768 to 32,767)\n";
     const std::string GAP_EXTEND_NOT_READ_ERROR =
-        "Error: gap extend penalty not read. Only integer scores accepted (-32,768 to 32,767)\n";
+        "error: gap extend penalty not read. Only integer scores accepted (-32,768 to 32,767)\n";
 
     const unsigned int NUM_DNA_CHARS = 4;
     const unsigned int NUM_PROTEIN_CHARS = 24;
@@ -100,7 +100,7 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
 } // namespace SequenceAlignment
 
 
-/** X86 implementation files */
+/** Implementation files */
 
-// #include "alignSequenceCPU.cpp"
-// #include "utils.cpp"
+#include "utilities.cpp"
+#include "alignSequenceCPU.cpp"

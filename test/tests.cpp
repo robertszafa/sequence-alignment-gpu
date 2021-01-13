@@ -3,7 +3,6 @@
 #include "catch.hpp"
 
 #include "../SequenceAlignment.hpp"
-#include "../utilities.hpp"
 
 
 TEST_CASE("indexOfLetter")
@@ -89,15 +88,20 @@ TEST_CASE("parseArguments")
 
 TEST_CASE("alignSequenceCPU")
 {
-    // const int argc = 3;
-    // const char *argv[argc] = { "./alignSequence", "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
-    // parseArguments(argc, argv);
+    const int argc = 7;
+    const char *argv[argc] = { "./alignSequence",  "--gap-open", "16", "--gap-extend", "4",
+                               "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
+    SequenceAlignment::Request request;
+    SequenceAlignment::Response response;
+    parseArguments(argc, argv, &request);
 
-    // SequenceAlignment::alignSequenceCPU();
+    SequenceAlignment::alignSequenceCPU(request, &response);
 
-    // const std::string expectedAlignment = "CCGCTG";
-    // auto gotAlignment = std::string(request.textBytes,
-    //                                 request.textBytes + request.alignmentNumBytes);
+    const std::string expectedAlignedText = "AC-ACGCTAG";
+    const std::string expectedAlignedPattern = "CCTATGGCTG";
 
-    // REQUIRE(expectedAlignment == gotAlignment);
+    REQUIRE(expectedAlignedText == std::string(response.alignedTextBytes,
+                                   response.alignedTextBytes + response.alignedTextNumBytes));
+    REQUIRE(expectedAlignedPattern == std::string(response.alignedPatternBytes,
+                                   response.alignedPatternBytes + response.alignedPatternNumBytes));
 }
