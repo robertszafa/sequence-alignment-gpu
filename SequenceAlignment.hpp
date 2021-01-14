@@ -89,9 +89,9 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     struct Response
     {
         /// Buffer holding the aligned text sequence.
-        char alignedTextBytes[MAX_SEQUENCE_LEN];
+        char alignedTextBytes[MAX_SEQUENCE_LEN*2];
         /// Buffer holding the aligned pattern sequence.
-        char alignedPatternBytes[MAX_SEQUENCE_LEN];
+        char alignedPatternBytes[MAX_SEQUENCE_LEN*2];
         int numAlignmentBytes;
         int score;
     };
