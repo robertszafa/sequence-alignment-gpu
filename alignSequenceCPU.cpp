@@ -87,11 +87,12 @@ void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reque
     }
 
     // traceBack
-    response->numAlignmentBytes = 0;
-
     unsigned int curr = numRows*numCols - 1;
     unsigned int textIndex = request.textNumBytes - 1;
     unsigned int patternIndex = request.patternNumBytes - 1;
+
+    response->numAlignmentBytes = 0;
+    response->score = alignMatrix[curr].val;
 
     while (curr != 0)
     {

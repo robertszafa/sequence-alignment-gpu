@@ -17,5 +17,9 @@ int main(int argc, const char *argv[])
     if (request.deviceType == SequenceAlignment::programArgs::CPU)
         SequenceAlignment::alignSequenceCPU(request, &response);
 
+    std::cout << std::string(response.alignedTextBytes, (response.alignedTextBytes + response.numAlignmentBytes)) << "\n";
+    std::cout << std::string(response.alignedPatternBytes, (response.alignedPatternBytes + response.numAlignmentBytes)) << "\n";
+    std::cout << "Score: " << response.score << "\n";
+
     return 0;
 }

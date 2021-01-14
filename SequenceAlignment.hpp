@@ -36,7 +36,7 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
        -c, --cpu             - use cpu device (default)\n\
        -g, --gpu             - use gpu device\n\
        -s, --score-matrix    - next argument is a score matrix file\n\
-       --gap-open            - next argument is a gap open penalty (default 10)\n\
+       --gap-open            - next argument is a gap open penalty (default 5)\n\
        --gap-extend          - next argument is a gap extend penalty (default 1)\n";
     const std::string SEQ_NOT_READ_ERROR =
         "error: text sequence or pattern sequence not read.\n";
@@ -93,6 +93,7 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         /// Buffer holding the aligned pattern sequence.
         char alignedPatternBytes[MAX_SEQUENCE_LEN];
         int numAlignmentBytes;
+        int score;
     };
 
 

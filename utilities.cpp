@@ -26,19 +26,24 @@ int getScore(char char1, char char2, const char *alphabet, const int alphabetSiz
 int validateAndTransform(const std::string &sequence, const char *alphabet, const int alphabetSize,
                          char *dstBuffer)
 {
+    unsigned int numRead = 0;
     for (int i=0; i<sequence.length(); ++i)
     {
         const char upperLetter = (sequence[i] > 90) ? sequence[i] - 32 : sequence[i];
+        // Ignore characters not on the A-Z range.
+        if (upperLetter < 65 || upperLetter > 90) continue;
 
-        dstBuffer[i] = indexOfLetter(upperLetter, alphabet, alphabetSize);
-        if (dstBuffer[i] == -1)
+        dstBuffer[numRead] = indexOfLetter(upperLetter, alphabet, alphabetSize);
+        if (dstBuffer[numRead] == -1)
         {
             std::cerr << "'" << sequence[i] << "'" << " letter not in alphabet." << std::endl;
             return -1;
         }
+
+        ++numRead;
     }
 
-    return 0;
+    return numRead;
 }
 
 /// Given a filename, copy the chars (bytes) from the file into a buffer.
@@ -47,21 +52,15 @@ int readSequenceBytes(const std::string fname,  const char *alphabet, const int 
                       char *dstBuffer)
 {
     std::ifstream f(fname);
-    int numBytesRead = 0;
     if (f.good())
     {
         // Use string's range constructor to copy over entire file to memory.
         std::string fileString((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-        if (validateAndTransform(fileString, alphabet, alphabetSize, dstBuffer) == -1) return -1;
-        numBytesRead = fileString.length();
-    }
-    else
-    {
-        std::cerr << fname << " file does not exist" << std::endl;
-        return -1;
+        return validateAndTransform(fileString, alphabet, alphabetSize, dstBuffer);
     }
 
-    return numBytesRead;
+    std::cerr << fname << " file does not exist" << std::endl;
+    return -1;
 }
 
 int parseScoreMatrixFile(const std::string& fname, const int alphabetSize, short *buffer)
