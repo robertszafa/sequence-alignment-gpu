@@ -62,8 +62,8 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     const programArgs DEFAULT_SEQUENCE = programArgs::DNA;
     static const char *DEFAULT_ALPHABET = DNA_ALPHABET;
     const int DEFAULT_ALPHABET_SIZE = NUM_DNA_CHARS;
-    const short DEFAULT_GAP_OPEN = 10;
-    const short DEFAULT_GAP_EXTEND = 1;
+    const short DEFAULT_GAP_OPEN_SCORE = -5;
+    const short DEFAULT_GAP_EXTEND_SCORE = -1;
     const std::string DEFAULT_DNA_SCORE_MATRIX_FILE = "scoreMatrices/dna/blast.txt";
     const std::string DEFAULT_PROTEIN_SCORE_MATRIX_FILE = "scoreMatrices/protein/blosum50.txt";
 
@@ -83,7 +83,7 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         /// Substitution matrix stored in row major order.
         short scoreMatrix[NUM_PROTEIN_CHARS * NUM_PROTEIN_CHARS];
         /// Penalties for opening and extending gaps.
-        short gapOpen; short gapExtend;
+        short gapOpenScore; short gapExtendScore;
     };
 
     struct Response

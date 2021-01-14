@@ -6,7 +6,7 @@
 
 /// Given a letter and an alphabet array,
 /// return the index of that letter in the  alphabet array.
-char indedOfLetter(const char letter, const char *alphabet, const int alphabetSize)
+char indexOfLetter(const char letter, const char *alphabet, const int alphabetSize)
 {
     auto letterItr = std::find(alphabet, alphabet + alphabetSize, letter);
     if (letterItr == (alphabet + alphabetSize)) return -1;
@@ -18,8 +18,8 @@ char indedOfLetter(const char letter, const char *alphabet, const int alphabetSi
 int getScore(char char1, char char2, const char *alphabet, const int alphabetSize,
              const short *scoreMatrix)
 {
-    int idx = indedOfLetter(char1, alphabet, alphabetSize) * alphabetSize +
-              indedOfLetter(char2, alphabet, alphabetSize);
+    int idx = indexOfLetter(char1, alphabet, alphabetSize) * alphabetSize +
+              indexOfLetter(char2, alphabet, alphabetSize);
     return scoreMatrix[idx];
 }
 
@@ -30,7 +30,7 @@ int validateAndTransform(const std::string &sequence, const char *alphabet, cons
     {
         const char upperLetter = (sequence[i] > 90) ? sequence[i] - 32 : sequence[i];
 
-        dstBuffer[i] = indedOfLetter(upperLetter, alphabet, alphabetSize);
+        dstBuffer[i] = indexOfLetter(upperLetter, alphabet, alphabetSize);
         if (dstBuffer[i] == -1)
         {
             std::cerr << "'" << sequence[i] << "'" << " letter not in alphabet." << std::endl;
@@ -103,8 +103,8 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
     request->sequenceType = SequenceAlignment::DEFAULT_SEQUENCE;
     request->alphabet = SequenceAlignment::DEFAULT_ALPHABET;
     request->alphabetSize = SequenceAlignment::DEFAULT_ALPHABET_SIZE;
-    request->gapOpen = SequenceAlignment::DEFAULT_GAP_OPEN;
-    request->gapExtend = SequenceAlignment::DEFAULT_GAP_EXTEND;
+    request->gapOpenScore = SequenceAlignment::DEFAULT_GAP_OPEN_SCORE;
+    request->gapExtendScore = SequenceAlignment::DEFAULT_GAP_EXTEND_SCORE;
     request->textNumBytes = 0;
     request->patternNumBytes = 0;
 
@@ -148,7 +148,7 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
         {
             try
             {
-                request->gapOpen = std::stoi(argv[i]);
+                request->gapOpenScore = -std::stoi(argv[i]);
             }
             catch (...) // std::invalid_argument, std::out_of_range
             {
@@ -161,7 +161,7 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
         {
             try
             {
-                request->gapExtend = std::stoi(argv[i]);
+                request->gapExtendScore = -std::stoi(argv[i]);
             }
             catch (...) // std::invalid_argument, std::out_of_range
             {

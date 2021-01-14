@@ -7,9 +7,9 @@
 
 TEST_CASE("indexOfLetter")
 {
-    REQUIRE(indedOfLetter('A', SequenceAlignment::DNA_ALPHABET, SequenceAlignment::NUM_DNA_CHARS) == 0);
-    REQUIRE(indedOfLetter('H', SequenceAlignment::DNA_ALPHABET, SequenceAlignment::NUM_DNA_CHARS) == -1);
-    REQUIRE(indedOfLetter('H', SequenceAlignment::PROTEIN_ALPHABET, SequenceAlignment::NUM_PROTEIN_CHARS) == 8);
+    REQUIRE(indexOfLetter('A', SequenceAlignment::DNA_ALPHABET, SequenceAlignment::NUM_DNA_CHARS) == 0);
+    REQUIRE(indexOfLetter('H', SequenceAlignment::DNA_ALPHABET, SequenceAlignment::NUM_DNA_CHARS) == -1);
+    REQUIRE(indexOfLetter('H', SequenceAlignment::PROTEIN_ALPHABET, SequenceAlignment::NUM_PROTEIN_CHARS) == 8);
 }
 
 TEST_CASE("parseScoreMatrixFile")
@@ -89,16 +89,16 @@ TEST_CASE("parseArguments")
 TEST_CASE("alignSequenceCPU")
 {
     const int argc = 7;
-    const char *argv[argc] = { "./alignSequence",  "--gap-open", "16", "--gap-extend", "4",
-                               "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
-    SequenceAlignment::Request request;
+    const char *argv[argc] = { "./alignSequence",  "--gap-open", "5", "--gap-extend", "1",
+                               "data/dna/dna_03.txt", "data/dna/dna_04.txt"};
+    SequenceAlignment::Request request = {};
     SequenceAlignment::Response response;
     parseArguments(argc, argv, &request);
 
     SequenceAlignment::alignSequenceCPU(request, &response);
 
-    const std::string expectedAlignedText = "AC-ACGCTAG";
-    const std::string expectedAlignedPattern = "CCTATGGCTG";
+    const std::string expectedAlignedText = "AC-AC";
+    const std::string expectedAlignedPattern = "CCTA-";
 
     REQUIRE(expectedAlignedText == std::string(response.alignedTextBytes,
                                    response.alignedTextBytes + response.alignedTextNumBytes));
