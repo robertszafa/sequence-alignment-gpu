@@ -51,9 +51,9 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     const unsigned int NUM_PROTEIN_CHARS = 24;
     /// The order of scores in a file with a scoring matrix is fixed ('*' represents a gap).
     /// Characters are transformed into ordered integers, e.g. for DNA A->0, T->1, C->3, ...
-    const char DNA_ALPHABET[] =  {'A', 'T', 'C', 'G'};
+    const char DNA_ALPHABET[] =  {'A', 'T', 'C', 'G', '-'};
     const char PROTEIN_ALPHABET[] =  {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K',
-                                      'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'B', 'J', 'Z', 'X'};
+                                      'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'B', 'J', 'Z', 'X', '-'};
 
     const unsigned int MAX_SEQUENCE_LEN = 4096;
 
@@ -89,9 +89,10 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     struct Response
     {
         /// Buffer holding the aligned text sequence.
-        char alignedTextBytes[MAX_SEQUENCE_LEN]; int alignedTextNumBytes;
+        char alignedTextBytes[MAX_SEQUENCE_LEN];
         /// Buffer holding the aligned pattern sequence.
-        char alignedPatternBytes[MAX_SEQUENCE_LEN]; int alignedPatternNumBytes;
+        char alignedPatternBytes[MAX_SEQUENCE_LEN];
+        int numAlignmentBytes;
     };
 
 

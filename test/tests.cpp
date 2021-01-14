@@ -101,7 +101,7 @@ TEST_CASE("alignSequenceCPU")
     const std::string expectedAlignedPattern = "CCTA-";
 
     REQUIRE(expectedAlignedText == std::string(response.alignedTextBytes,
-                                   response.alignedTextBytes + response.alignedTextNumBytes));
+                                               response.alignedTextBytes + response.numAlignmentBytes));
     REQUIRE(expectedAlignedPattern == std::string(response.alignedPatternBytes,
-                                   response.alignedPatternBytes + response.alignedPatternNumBytes));
+                                                  response.alignedPatternBytes + response.numAlignmentBytes));
 }

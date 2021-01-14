@@ -6,7 +6,8 @@
 enum direction {LEFT, DIAG, TOP};
 struct alignPoint
 {
-    int val; unsigned short gapLenTop; unsigned short gapLenLeft; direction dir;
+    int val; unsigned short gapLenTop; unsigned short gapLenLeft;
+    bool fromLeft; bool fromDiagonal; bool fromTop;
     /// Order alignment points based on their score.
     bool operator <(const alignPoint &b) const { return val < b.val;};
 };
@@ -26,14 +27,18 @@ void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reque
     for (int i_pattern = 1; i_pattern < numCols; ++i_pattern)
     {
         alignMatrix[i_pattern].val = (i_pattern - 1) * request.gapExtendScore + request.gapOpenScore;
-        alignMatrix[i_pattern].dir = direction::LEFT;
+        alignMatrix[i_pattern].fromLeft = true;
+        alignMatrix[i_pattern].fromDiagonal = false;
+        alignMatrix[i_pattern].fromTop = false;
         alignMatrix[i_pattern].gapLenLeft = i_pattern;
         alignMatrix[i_pattern].gapLenTop = 0;
     }
     for (int i_text = 1; i_text < numRows; ++i_text)
     {
         alignMatrix[i_text * numCols].val = (i_text - 1) * request.gapExtendScore + request.gapOpenScore;
-        alignMatrix[i_text * numCols].dir = direction::TOP;
+        alignMatrix[i_text * numCols].fromLeft = false;
+        alignMatrix[i_text * numCols].fromDiagonal = false;
+        alignMatrix[i_text * numCols].fromTop = true;
         alignMatrix[i_text * numCols].gapLenTop = i_text;
         alignMatrix[i_text * numCols].gapLenLeft = 0;
     }
@@ -55,7 +60,8 @@ void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reque
             const int scoreMatrixIdx = ((int)textByte) * request.alphabetSize + ((int)patternByte);
 
             // Calculate all alignment scores.
-            const int fromDiagonalScore = alignMatrix[diagonalAlignIdx].val + request.scoreMatrix[scoreMatrixIdx];
+            const int fromDiagonalScore = alignMatrix[diagonalAlignIdx].val +
+                                          request.scoreMatrix[scoreMatrixIdx];
             // Are we opening a gap?
             const bool gapOpenFromTop = (alignMatrix[topAlignIdx].gapLenTop == 0);
             const bool gapOpneFromLeft = (alignMatrix[leftAlignIdx].gapLenLeft == 0);
@@ -75,25 +81,44 @@ void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reque
             alignMatrix[thisAlignIdx].val = std::max(fromDiagonalScore, std::max(fromLeftScore, fromTopScore));
             alignMatrix[thisAlignIdx].gapLenLeft = isFromLeft * (alignMatrix[leftAlignIdx].gapLenLeft + 1);
             alignMatrix[thisAlignIdx].gapLenTop = isFromTop * (alignMatrix[topAlignIdx].gapLenTop + 1);
-            alignMatrix[thisAlignIdx].dir = (direction) (isFromLeft * direction::LEFT +
-                                                         isFromDiagonal * direction::DIAG +
-                                                         isFromTop * direction::TOP);
+            alignMatrix[thisAlignIdx].fromLeft = isFromLeft;
+            alignMatrix[thisAlignIdx].fromDiagonal = isFromDiagonal;
+            alignMatrix[thisAlignIdx].fromTop = isFromTop;
 
             ++leftAlignIdx; ++thisAlignIdx; ++topAlignIdx; ++diagonalAlignIdx;
         }
     }
 
     // traceBack
+    response->numAlignmentBytes = 0;
+
     unsigned int curr = numRows*numCols - 1;
-    std::cout << alignMatrix[curr].val << "\n";
+    unsigned int textIndex = request.textNumBytes - 1;
+    unsigned int patternIndex = request.patternNumBytes - 1;
 
-    // for (int i=0; i<(std::max(request.textNumBytes, request.patternNumBytes)); ++i)
-    // {
-    //     // Get back actual letter.
-    //     std::cout << curr->dir;
-    //     curr = alignMatrix + curr->prev;
-    // }
+    while (curr != 0)
+    {
+        const bool takeText = (alignMatrix[curr].fromDiagonal || alignMatrix[curr].fromTop);
+        const bool takePattern = (alignMatrix[curr].fromDiagonal || alignMatrix[curr].fromLeft);
+        response->alignedTextBytes[response->numAlignmentBytes] =
+            takeText * request.textBytes[textIndex] + (!takeText) * request.alphabetSize;
+        response->alignedPatternBytes[response->numAlignmentBytes] =
+            takePattern * request.patternBytes[patternIndex] + (!takePattern) * request.alphabetSize;
 
-    // std::reverse(textBytes, textBytes + alignmentNumBytes);
+        response->numAlignmentBytes += 1;
+        textIndex -= takeText;
+        patternIndex -= takePattern;
+        curr -= (alignMatrix[curr].fromLeft) +
+                (alignMatrix[curr].fromDiagonal * (numCols+1)) +
+                (alignMatrix[curr].fromTop * (numCols));
+    }
 
+    std::reverse(response->alignedTextBytes, (response->alignedTextBytes + response->numAlignmentBytes));
+    std::reverse(response->alignedPatternBytes, (response->alignedPatternBytes + response->numAlignmentBytes));
+
+    for (int i=0; i<response->numAlignmentBytes; ++i)
+    {
+        response->alignedTextBytes[i] = request.alphabet[response->alignedTextBytes[i]];
+        response->alignedPatternBytes[i] = request.alphabet[response->alignedPatternBytes[i]];
+    }
 }
