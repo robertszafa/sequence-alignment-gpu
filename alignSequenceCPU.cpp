@@ -3,13 +3,10 @@
 #include <iostream>
 
 
-enum direction {LEFT, DIAG, TOP};
 struct alignPoint
 {
     int val; unsigned short gapLenTop; unsigned short gapLenLeft;
     bool fromLeft; bool fromDiagonal; bool fromTop;
-    /// Order alignment points based on their score.
-    bool operator <(const alignPoint &b) const { return val < b.val;};
 };
 
 void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &request,
