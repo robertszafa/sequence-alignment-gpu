@@ -104,12 +104,15 @@ void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reque
                                      request.gapExtendScore * alignMatrix[leftAlignIdx].gapLenLeft;
 
             // Find out the best alignment.
-            const bool isFromDiagonal = fromDiagonalScore >= std::max(fromLeftScore, fromTopScore);
-            const bool isFromLeft = !(isFromDiagonal) && fromLeftScore >= fromTopScore;
-            const bool isFromTop = !(isFromDiagonal) && !(isFromLeft);
+            // Order in case of ties: diagonal, left, top.
+            const int maxWithGap = std::max(fromLeftScore, fromTopScore);
+            const int bestScore = std::max(fromDiagonalScore, maxWithGap);
+            const bool isFromDiagonal = (fromDiagonalScore >= maxWithGap);
+            const bool isFromLeft = (fromDiagonalScore < maxWithGap) && (fromLeftScore >= fromTopScore);
+            const bool isFromTop = (fromDiagonalScore < maxWithGap) && (fromLeftScore < fromTopScore);
 
             // Populate this alignPoint with the best alignment.
-            alignMatrix[thisAlignIdx].val = std::max(fromDiagonalScore, std::max(fromLeftScore, fromTopScore));
+            alignMatrix[thisAlignIdx].val = bestScore;
             alignMatrix[thisAlignIdx].gapLenLeft = isFromLeft * (alignMatrix[leftAlignIdx].gapLenLeft + 1);
             alignMatrix[thisAlignIdx].gapLenTop = isFromTop * (alignMatrix[topAlignIdx].gapLenTop + 1);
             alignMatrix[thisAlignIdx].fromLeft = isFromLeft;
