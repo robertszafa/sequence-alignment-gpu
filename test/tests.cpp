@@ -89,7 +89,7 @@ TEST_CASE("parseArguments")
 TEST_CASE("alignSequenceCPU")
 {
 
-    SECTION("1")
+    SECTION("DNA_01")
     {
         const int argc = 7;
         const char *argv[argc] = { "./alignSequence",  "--gap-open", "5", "--gap-extend", "1",
@@ -109,19 +109,19 @@ TEST_CASE("alignSequenceCPU")
                                                     response.alignedPatternBytes + response.numAlignmentBytes));
     }
 
-    SECTION("2")
+    SECTION("DNA_02")
     {
         SequenceAlignment::Request request;
         SequenceAlignment::Response response;
 
-        const std::string text = "ATGAAGT";
-        const std::string pattern = "CATAAAAC";
+        const std::string text = "TTCGCCT";
+        const std::string pattern = "CTCGGTC";
         request.deviceType = SequenceAlignment::programArgs::CPU;
         request.sequenceType = SequenceAlignment::programArgs::DNA;
         request.alphabet = SequenceAlignment::DNA_ALPHABET;
         request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
-        request.gapOpenScore = 5;
-        request.gapExtendScore = 1;
+        request.gapOpenScore = -5;
+        request.gapExtendScore = -1;
         request.textNumBytes = text.length();
         request.patternNumBytes = pattern.length();
         validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
@@ -130,9 +130,48 @@ TEST_CASE("alignSequenceCPU")
 
         SequenceAlignment::alignSequenceCPU(request, &response);
 
-        const std::string expectedAlignedText = "-ATGAAGT";
-        const std::string expectedAlignedPattern = "CATAAAAC";
+        const std::string expectedAlignedText = "TTCG--CCT";
+        const std::string expectedAlignedPattern  ="CTCGGTC--";
+        const int expectedScore = 10;
 
+        REQUIRE(expectedScore == response.score);
+        REQUIRE(expectedAlignedText == std::string(response.alignedTextBytes,
+                                                response.alignedTextBytes + response.numAlignmentBytes));
+        REQUIRE(expectedAlignedPattern == std::string(response.alignedPatternBytes,
+                                                    response.alignedPatternBytes + response.numAlignmentBytes));
+    }
+
+    SECTION("DNA_03")
+    {
+        SequenceAlignment::Request request;
+        SequenceAlignment::Response response;
+
+        const std::string text =
+            "CATAAAACTCTCGGTCGGGCTTAGTACCAGGACCGGCGCACCAGAGTGTCAATCACGACCCTTCACACTTTGTGC";
+        const std::string pattern =
+            "ATGAAGTTGTTCGCCTTACTTTTAATTCTACTCTCTCCTCGAGATTCGTCCGCTGAAAAATCTCTCAGCG";
+
+        request.deviceType = SequenceAlignment::programArgs::CPU;
+        request.sequenceType = SequenceAlignment::programArgs::DNA;
+        request.alphabet = SequenceAlignment::DNA_ALPHABET;
+        request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
+        request.gapOpenScore = -5;
+        request.gapExtendScore = -1;
+        request.textNumBytes = text.length();
+        request.patternNumBytes = pattern.length();
+        validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
+        validateAndTransform(pattern, request.alphabet, request.alphabetSize, request.patternBytes);
+        parseScoreMatrixFile(SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
+
+        SequenceAlignment::alignSequenceCPU(request, &response);
+
+        const std::string expectedAlignedText =
+            "ATGAAGTTGTTCGCCTTACTTTTAATTCTACTCTCTCCTCGAGATTCGT-CC-------GCTG-A--AAAATCTC--TCAGCG------------------";
+        const std::string expectedAlignedPattern =
+            "--------------CATA-----AA----ACTCTC-GGTCGGGCTTAGTACCAGGACCGGC-GCACCAGAGTGTCAATCA-CGACCCTTCACACTTTGTGC";
+        const int expectedScore = 74;
+
+        REQUIRE(expectedScore == response.score);
         REQUIRE(expectedAlignedText == std::string(response.alignedTextBytes,
                                                 response.alignedTextBytes + response.numAlignmentBytes));
         REQUIRE(expectedAlignedPattern == std::string(response.alignedPatternBytes,

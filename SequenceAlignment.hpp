@@ -100,8 +100,7 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     /// A structure representing a cell in the slignment matrix,
     struct alignPoint
     {
-        int val; unsigned short gapLenTop; unsigned short gapLenLeft;
-        bool fromLeft; bool fromDiagonal; bool fromTop;
+        int score; bool isFromLeft; bool isFromDiag; bool isFromTop;
     };
 
 
