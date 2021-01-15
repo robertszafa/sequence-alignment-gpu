@@ -14,10 +14,10 @@ void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reque
 {
 
     /// Buffer holding the values of the alignment matrix and a trace. Zeroed at start.
-    static alignPoint alignMatrix[(MAX_SEQUENCE_LEN+1) * (MAX_SEQUENCE_LEN+1)];
     /// Aditional row and column for the gap character.
     const unsigned int numRows = request.textNumBytes + 1;
     const unsigned int numCols = request.patternNumBytes + 1;
+    static alignPoint alignMatrix[(MAX_SEQUENCE_LEN+1) * (MAX_SEQUENCE_LEN+1)];
 
     // Init first row and column.
     alignMatrix[0].val = 0; alignMatrix[0].gapLenLeft = 0; alignMatrix[0].gapLenTop = 0;
@@ -88,8 +88,8 @@ void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reque
 
     // traceBack
     unsigned int curr = numRows*numCols - 1;
-    unsigned int textIndex = request.textNumBytes - 1;
-    unsigned int patternIndex = request.patternNumBytes - 1;
+    int textIndex = request.textNumBytes - 1;
+    int patternIndex = request.patternNumBytes - 1;
 
     response->numAlignmentBytes = 0;
     response->score = alignMatrix[curr].val;
@@ -104,8 +104,9 @@ void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reque
             takePattern * request.patternBytes[patternIndex] + (!takePattern) * request.alphabetSize;
 
         response->numAlignmentBytes += 1;
-        textIndex -= takeText;
-        patternIndex -= takePattern;
+        // Saturate at 0.
+        textIndex = std::max(0, textIndex - takeText);
+        patternIndex = std::max(0, patternIndex - takePattern);
         curr -= (alignMatrix[curr].fromLeft) +
                 (alignMatrix[curr].fromDiagonal * (numCols+1)) +
                 (alignMatrix[curr].fromTop * (numCols));
