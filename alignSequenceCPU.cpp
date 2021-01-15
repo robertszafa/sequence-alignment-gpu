@@ -3,11 +3,45 @@
 #include <iostream>
 
 
-struct alignPoint
+void SequenceAlignment::traceBack(const alignPoint *alignMatrix,
+                                  const unsigned int numRows, const unsigned int numCols,
+                                  const SequenceAlignment::Request &request,
+                                  SequenceAlignment::Response *response)
 {
-    int val; unsigned short gapLenTop; unsigned short gapLenLeft;
-    bool fromLeft; bool fromDiagonal; bool fromTop;
-};
+    unsigned int curr = numRows * numCols - 1;
+    int textIndex = request.textNumBytes - 1;
+    int patternIndex = request.patternNumBytes - 1;
+
+    response->numAlignmentBytes = 0;
+    response->score = alignMatrix[curr].val;
+
+    while (curr != 0)
+    {
+        const bool takeText = (alignMatrix[curr].fromDiagonal || alignMatrix[curr].fromTop);
+        const bool takePattern = (alignMatrix[curr].fromDiagonal || alignMatrix[curr].fromLeft);
+        response->alignedTextBytes[response->numAlignmentBytes] =
+            takeText * request.textBytes[textIndex] + (!takeText) * request.alphabetSize;
+        response->alignedPatternBytes[response->numAlignmentBytes] =
+            takePattern * request.patternBytes[patternIndex] + (!takePattern) * request.alphabetSize;
+
+        response->numAlignmentBytes += 1;
+        // Saturate at 0.
+        textIndex = std::max(0, textIndex - takeText);
+        patternIndex = std::max(0, patternIndex - takePattern);
+        curr -= (alignMatrix[curr].fromLeft) +
+                (alignMatrix[curr].fromDiagonal * (numCols+1)) +
+                (alignMatrix[curr].fromTop * (numCols));
+    }
+
+    std::reverse(response->alignedTextBytes, (response->alignedTextBytes + response->numAlignmentBytes));
+    std::reverse(response->alignedPatternBytes, (response->alignedPatternBytes + response->numAlignmentBytes));
+
+    for (int i=0; i<response->numAlignmentBytes; ++i)
+    {
+        response->alignedTextBytes[i] = request.alphabet[response->alignedTextBytes[i]];
+        response->alignedPatternBytes[i] = request.alphabet[response->alignedPatternBytes[i]];
+    }
+}
 
 void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &request,
                                          SequenceAlignment::Response *response)
@@ -86,38 +120,6 @@ void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reque
         }
     }
 
-    // traceBack
-    unsigned int curr = numRows*numCols - 1;
-    int textIndex = request.textNumBytes - 1;
-    int patternIndex = request.patternNumBytes - 1;
+    traceBack(alignMatrix, numRows, numCols, request, response);
 
-    response->numAlignmentBytes = 0;
-    response->score = alignMatrix[curr].val;
-
-    while (curr != 0)
-    {
-        const bool takeText = (alignMatrix[curr].fromDiagonal || alignMatrix[curr].fromTop);
-        const bool takePattern = (alignMatrix[curr].fromDiagonal || alignMatrix[curr].fromLeft);
-        response->alignedTextBytes[response->numAlignmentBytes] =
-            takeText * request.textBytes[textIndex] + (!takeText) * request.alphabetSize;
-        response->alignedPatternBytes[response->numAlignmentBytes] =
-            takePattern * request.patternBytes[patternIndex] + (!takePattern) * request.alphabetSize;
-
-        response->numAlignmentBytes += 1;
-        // Saturate at 0.
-        textIndex = std::max(0, textIndex - takeText);
-        patternIndex = std::max(0, patternIndex - takePattern);
-        curr -= (alignMatrix[curr].fromLeft) +
-                (alignMatrix[curr].fromDiagonal * (numCols+1)) +
-                (alignMatrix[curr].fromTop * (numCols));
-    }
-
-    std::reverse(response->alignedTextBytes, (response->alignedTextBytes + response->numAlignmentBytes));
-    std::reverse(response->alignedPatternBytes, (response->alignedPatternBytes + response->numAlignmentBytes));
-
-    for (int i=0; i<response->numAlignmentBytes; ++i)
-    {
-        response->alignedTextBytes[i] = request.alphabet[response->alignedTextBytes[i]];
-        response->alignedPatternBytes[i] = request.alphabet[response->alignedPatternBytes[i]];
-    }
 }

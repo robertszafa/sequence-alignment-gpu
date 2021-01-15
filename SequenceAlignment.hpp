@@ -97,7 +97,18 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     };
 
 
+    /// A structure representing a cell in the slignment matrix,
+    struct alignPoint
+    {
+        int val; unsigned short gapLenTop; unsigned short gapLenLeft;
+        bool fromLeft; bool fromDiagonal; bool fromTop;
+    };
+
+
     void alignSequenceCPU(const Request&, Response*);
+
+    void traceBack(const alignPoint*, const unsigned int, const unsigned int,
+                   const Request&, Response*);
 
 } // namespace SequenceAlignment
 
