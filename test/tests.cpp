@@ -91,8 +91,8 @@ TEST_CASE("alignSequenceGlobalCPU")
 
     SECTION("DNA_01")
     {
-        const int argc = 8;
-        const char *argv[argc] = { "./alignSequence",  "--gap-open", "5", "--gap-extend", "1", "--global",
+        const int argc = 6;
+        const char *argv[argc] = { "./alignSequence",  "--gap-penalty", "5", "--global",
                                 "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
         SequenceAlignment::Request request = {};
         SequenceAlignment::Response response;
@@ -117,8 +117,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
         request.alphabet = SequenceAlignment::DNA_ALPHABET;
         request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
-        request.gapOpenScore = -5;
-        request.gapExtendScore = -1;
+        request.gapPenalty = 5;
         request.textNumBytes = text.length();
         request.patternNumBytes = pattern.length();
         validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
@@ -128,7 +127,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         SequenceAlignment::alignSequenceGlobalCPU(request, &response);
 
         // Don't check the aligned sequences since there can be multiple alignments with the same score.
-        const int expectedScore = -2;
+        const int expectedScore = -4;
         REQUIRE(expectedScore == response.score);
     }
 
@@ -144,8 +143,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
         request.alphabet = SequenceAlignment::DNA_ALPHABET;
         request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
-        request.gapOpenScore = -5;
-        request.gapExtendScore = -1;
+        request.gapPenalty = 5;
         request.textNumBytes = text.length();
         request.patternNumBytes = pattern.length();
         validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
@@ -155,7 +153,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         SequenceAlignment::alignSequenceGlobalCPU(request, &response);
 
         // Don't check the aligned sequences since there can be multiple alignments with the same score.
-        const int expectedScore = 4;
+        const int expectedScore = 2;
         REQUIRE(expectedScore == response.score);
     }
 
@@ -169,14 +167,20 @@ TEST_CASE("alignSequenceGlobalCPU")
             "CATAAAACTCTCGGTCGGGCTTAGTACCAGGACCGGCGCACCAGAGTGTCAATCACGACCCTTCACACTTTGTGC";
         const std::string pattern =
             "ATGAAGTTGTTCGCCTTACTTTTAATTCTACTCTCTCCTCGAGATTCGTCCGCTGAAAAATCTCTCAGCG";
+        // There may be multiple alignments with the same score. These expected alignments
+        // are for regression testing.
+        const std::string expectedAlignedText =
+            "CATAAAACTCTCGGTCGGGCTTAGTACCAGGAC--CGGCGCACCA-GAG-TGTCAATCACGACCCTTCACACTTTGT--GC-";
+        const std::string expectedAlignedPattern =
+            "-ATGAAG-T-T-GTTCGC-CTTACTTTTAATTCTACT-CTCTCCTCGAGAT-TCG-TC-CG-C--TGAAAAATCTCTCAGCG";
+        const int expectedScore = 22;
 
         request.deviceType = SequenceAlignment::programArgs::CPU;
         request.sequenceType = SequenceAlignment::programArgs::DNA;
         request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
         request.alphabet = SequenceAlignment::DNA_ALPHABET;
         request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
-        request.gapOpenScore = -5;
-        request.gapExtendScore = -1;
+        request.gapPenalty = 5;
         request.textNumBytes = text.length();
         request.patternNumBytes = pattern.length();
         validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
@@ -185,27 +189,29 @@ TEST_CASE("alignSequenceGlobalCPU")
 
         SequenceAlignment::alignSequenceGlobalCPU(request, &response);
 
-        std::cout << std::string(response.alignedTextBytes, response.alignedTextBytes + response.numAlignmentBytes) << "\n";
-        std::cout << std::string(response.alignedPatternBytes, response.alignedPatternBytes + response.numAlignmentBytes) << "\n";
+        auto gotAlignedText = std::string(response.alignedTextBytes,
+                                          (response.alignedTextBytes + response.numAlignmentBytes));
+        auto gotAlignedPattern = std::string(response.alignedPatternBytes,
+                                             (response.alignedPatternBytes + response.numAlignmentBytes));
 
-        // Don't check the aligned sequences since there can be multiple alignments with the same score.
-        const int expectedScore = 53;
         REQUIRE(expectedScore == response.score);
+        REQUIRE(expectedAlignedText == gotAlignedText);
+        REQUIRE(expectedAlignedPattern == gotAlignedPattern);
     }
 
-    // SECTION("DNA_05")
-    // {
-    //     const int argc = 7;
-    //     const char *argv[argc] = {"./alignSequence",  "--gap-open", "5", "--gap-extend", "1",
-    //                               "data/dna/NC_018874.txt", "data/dna/NC_018874_mutaded.txt"};
-    //     SequenceAlignment::Request request = {};
-    //     SequenceAlignment::Response response;
-    //     parseArguments(argc, argv, &request);
+    SECTION("DNA_05")
+    {
+        const int argc = 6;
+        const char *argv[argc] = {"./alignSequence", "--gap-penalty", "5", "--global",
+                                  "data/dna/NC_018874.txt", "data/dna/NC_018874_mutaded.txt"};
+        SequenceAlignment::Request request = {};
+        SequenceAlignment::Response response;
+        parseArguments(argc, argv, &request);
 
-    //     SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
 
-    //     // Don't check the aligned sequences since there can be multiple alignments with the same score.
-    //     const int expectedScore = 5535;
-    //     REQUIRE(expectedScore == response.score);
-    // }
+        // Don't check the aligned sequences since there can be multiple alignments with the same score.
+        const int expectedScore = 2673;
+        REQUIRE(expectedScore == response.score);
+    }
 }
