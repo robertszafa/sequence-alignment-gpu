@@ -13,25 +13,30 @@ void SequenceAlignment::traceBack(const alignPoint *alignMatrix,
     int curr = lastPointIdx;
 
     int maxScore = alignMatrix[curr].score;
-    // Check last row;
+    int numEndGapsText = 0;
+    int numEndGapsPattern = 0;
+
+    // Check last row and col to see if we can get a better score by staring a gap at the end.
     for (int i = ((numRows-1) * numCols); i < (numRows*numCols); ++i)
     {
-        bool isLarger = alignMatrix[i].score > maxScore;
-        maxScore = isLarger ? alignMatrix[i].score : maxScore;
-        curr = isLarger ? i : curr;
+        int scoreFromHere = alignMatrix[i].score + request.gapOpenScore +
+                            (request.gapExtendScore * (lastPointIdx - i - 1));
+        maxScore = (scoreFromHere > maxScore) ? scoreFromHere : maxScore;
+        curr = (scoreFromHere > maxScore) ? i : curr;
     }
     // Check last column.
     for (int i = 0; i < numRows; ++i)
     {
         const int lastCol = i*numCols + (numCols-1);
-        bool isLarger = alignMatrix[lastCol].score > maxScore;
-        maxScore = isLarger ? alignMatrix[lastCol].score : maxScore;
-        curr = isLarger ? lastCol : curr;
+        int scoreFromHere = alignMatrix[lastCol].score + request.gapOpenScore +
+                            (request.gapExtendScore * (numRows - i - 1));
+        maxScore = (scoreFromHere > maxScore) ? scoreFromHere : maxScore;
+        curr = (scoreFromHere > maxScore) ? lastCol : curr;
     }
 
     const int startOfLastRow = (numRows-1) * numCols;
-    const int numEndGapsText = std::max(0, (curr - startOfLastRow) - (lastPointIdx - startOfLastRow));
-    const int numEndGapsPattern = (curr < startOfLastRow) * ((int) std::floor((lastPointIdx - curr) / numCols));
+    numEndGapsText = std::max(0, (curr - startOfLastRow) - (lastPointIdx - startOfLastRow));
+    numEndGapsPattern = (curr < startOfLastRow) * ((int) std::floor((lastPointIdx - curr) / numCols));
 
     std::fill_n(response->alignedTextBytes, numEndGapsText, request.alphabetSize);
     std::fill_n(response->alignedPatternBytes, numEndGapsPattern, request.alphabetSize);
@@ -75,45 +80,47 @@ void SequenceAlignment::traceBack(const alignPoint *alignMatrix,
     }
 }
 
-void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &request,
-                                         SequenceAlignment::Response *response)
+
+void SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request &request,
+                                               SequenceAlignment::Response *response)
 {
 
     /// Buffer holding the values of the alignment matrix and a trace. Zeroed at start.
-    /// Aditional row and column for the gap character.
-    const unsigned int numRows = request.textNumBytes + 1;
-    const unsigned int numCols = request.patternNumBytes + 1;
+    // TODO: Store two rows in memory. When finished, swap pointers and write to disk.
     static alignPoint alignMatrix[(MAX_SEQUENCE_LEN+1) * (MAX_SEQUENCE_LEN+1)];
+    /// Aditional row and column for the gap character.
+    const unsigned int numCols = request.textNumBytes + 1;
+    const unsigned int numRows = request.patternNumBytes + 1;
 
     // Init first row and column.
     alignMatrix[0].score = 0;
-    alignMatrix[0].isFromLeft = false;
-    alignMatrix[0].isFromTop = false;
-    alignMatrix[0].isFromDiag = false;
-    for (int i_pattern = 1; i_pattern < numCols; ++i_pattern)
+    alignMatrix[0].isFromLeft = alignMatrix[0].isFromTop = alignMatrix[0].isFromDiag = false;
+    for (int i_text = 1; i_text < numCols; ++i_text)
     {
-        alignMatrix[i_pattern].score = (i_pattern - 1) * request.gapExtendScore + request.gapOpenScore;
-        alignMatrix[i_pattern].isFromLeft = true;
-        alignMatrix[i_pattern].isFromDiag = false;
-        alignMatrix[i_pattern].isFromTop = false;
+        alignMatrix[i_text].score = ((i_text - 1) * request.gapExtendScore + request.gapOpenScore);
+        alignMatrix[i_text].isFromLeft = true;
+        alignMatrix[i_text].isFromDiag = false;
+        alignMatrix[i_text].isFromTop = false;
     }
-    for (int i_text = 1; i_text < numRows; ++i_text)
+    for (int i_pattern = 1; i_pattern < numRows; ++i_pattern)
     {
-        alignMatrix[i_text * numCols].score = (i_text - 1) * request.gapExtendScore + request.gapOpenScore;
-        alignMatrix[i_text * numCols].isFromLeft = false;
-        alignMatrix[i_text * numCols].isFromDiag = false;
-        alignMatrix[i_text * numCols].isFromTop = true;
+        alignMatrix[i_pattern * numCols].score = ((i_pattern - 1) * request.gapExtendScore +
+                                                  request.gapOpenScore);
+        alignMatrix[i_pattern * numCols].isFromLeft = false;
+        alignMatrix[i_pattern * numCols].isFromDiag = false;
+        alignMatrix[i_pattern * numCols].isFromTop = true;
     }
 
-    for (int i_text = 1; i_text < numRows; ++i_text)
+    for (int i_pattern = 1; i_pattern < numRows; ++i_pattern)
     {
         // Compute this and neigbour indexes.
-        unsigned int leftAlignIdx = i_text * numCols;
+        // TODO: Store two rows in memory. When finished, swap pointers and write to disk.
+        unsigned int leftAlignIdx = i_pattern * numCols;
         unsigned int thisAlignIdx = leftAlignIdx + 1;
         unsigned int topAlignIdx = thisAlignIdx - numCols;
         unsigned int diagonalAlignIdx = thisAlignIdx - numCols - 1;
 
-        for (int i_pattern = 1; i_pattern < numCols; ++i_pattern)
+        for (int i_text = 1; i_text < numCols; ++i_text)
         {
             // std::cout << "--------\n[" << i_text << ", " << i_pattern << "] " << request.alphabet[request.textBytes[i_text - 1]] << "-" << request.alphabet[request.patternBytes[i_pattern - 1]] << "\t";
             // Get score for this letter combination. Note that i_text and i_pattern point one
@@ -127,10 +134,6 @@ void SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reque
                                           request.scoreMatrix[scoreMatrixIdx];
             // When selecting the top or left path, we are either opening a new gap or
             // extending an existing path.
-            // Also check if we are at the end of the pattern or text sequence.
-            // If yes, there is no penalty for gaps at the end.
-            // In bioinformatics, it is usually reasonable to assume that the sequences are
-            // incomplete and there should be no penalty for failing to align the missing bases.
             const int fromTopScore = alignMatrix[topAlignIdx].score +
                                      request.gapOpenScore * !(alignMatrix[topAlignIdx].isFromTop) +
                                      request.gapExtendScore * alignMatrix[topAlignIdx].isFromTop;

@@ -11,6 +11,8 @@ namespace SequenceAlignment
         CPU, GPU,
         /// What is the type of the input sequence?
         DNA, PROTEIN,
+        /// Which type of alignment algorithm should be used.
+        GLOBAL, LOCAL, SEMI_GLOBAL,
         /// The next argument is a file with the custom score matrix.
         SCORE_MATRIX,
         /// The next argument is the gap open penalty.
@@ -23,6 +25,9 @@ namespace SequenceAlignment
         { "--gpu", programArgs::GPU}, { "-g", programArgs::GPU},
         { "--dna", programArgs::DNA}, { "-d", programArgs::DNA},
         { "--protein", programArgs::PROTEIN}, { "-p", programArgs::PROTEIN},
+        { "--global", programArgs::GLOBAL},
+        { "--local", programArgs::LOCAL},
+        { "--semi-global", programArgs::SEMI_GLOBAL},
         { "--score-matrix", programArgs::SCORE_MATRIX}, { "-s", programArgs::SCORE_MATRIX},
         { "--gap-open", programArgs::GAP_OPEN},
         { "--gap-extend", programArgs::GAP_EXTEND},
@@ -35,11 +40,16 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
        -p, --protein         - align protein sequence\n\
        -c, --cpu             - use cpu device (default)\n\
        -g, --gpu             - use gpu device\n\
+       --global              - use global alignment (default)\n\
+       --semi-global         - use semi global alignment\n\
+       --local               - use local alignment\n\
        -s, --score-matrix    - next argument is a score matrix file\n\
        --gap-open            - next argument is a gap open penalty (default 5)\n\
        --gap-extend          - next argument is a gap extend penalty (default 1)\n";
     const std::string SEQ_NOT_READ_ERROR =
-        "error: text sequence or pattern sequence not read.\n";
+        "error: text sequence or pattern sequence not read\n";
+    const std::string TEXT_SHORTER_THAN_PATTERN_ERROR =
+        "error: text sequence cannot be shorter than the pattern sequence.\n";
     const std::string SCORE_MATRIX_NOT_READ_ERROR =
         "error: matrix scores not read. Only integer scores accepted (-32,768 to 32,767)\n";
     const std::string GAP_OPEN_NOT_READ_ERROR =
@@ -60,6 +70,7 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     /// Default program arguments.
     const programArgs DEFAULT_DEVICE = programArgs::CPU;
     const programArgs DEFAULT_SEQUENCE = programArgs::DNA;
+    const programArgs DEFAULT_ALIGNMENT_TYPE = programArgs::GLOBAL;
     static const char *DEFAULT_ALPHABET = DNA_ALPHABET;
     const int DEFAULT_ALPHABET_SIZE = NUM_DNA_CHARS;
     const short DEFAULT_GAP_OPEN_SCORE = -5;
@@ -74,6 +85,8 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         programArgs deviceType;
         /// What is the type of the sequences.
         programArgs sequenceType;
+        /// What is the type of the aignment algorithm.
+        programArgs alignmentType;
         /// Buffer holding the text sequence.
         char textBytes[MAX_SEQUENCE_LEN]; int textNumBytes;
         /// Buffer holding the pattern sequence.
@@ -104,7 +117,7 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     };
 
 
-    void alignSequenceCPU(const Request&, Response*);
+    void alignSequenceGlobalCPU(const Request&, Response*);
 
     void traceBack(const alignPoint*, const unsigned int, const unsigned int,
                    const Request&, Response*);

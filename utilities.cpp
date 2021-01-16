@@ -100,6 +100,7 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
     // Set all to default.
     request->deviceType = SequenceAlignment::DEFAULT_DEVICE;
     request->sequenceType = SequenceAlignment::DEFAULT_SEQUENCE;
+    request->alignmentType = SequenceAlignment::DEFAULT_ALIGNMENT_TYPE;
     request->alphabet = SequenceAlignment::DEFAULT_ALPHABET;
     request->alphabetSize = SequenceAlignment::DEFAULT_ALPHABET_SIZE;
     request->gapOpenScore = SequenceAlignment::DEFAULT_GAP_OPEN_SCORE;
@@ -126,7 +127,13 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
                                      setArg == SequenceAlignment::programArgs::PROTEIN)
                                      ? setArg
                                      : request->sequenceType;
+            request->alignmentType = (setArg == SequenceAlignment::programArgs::GLOBAL ||
+                                     setArg == SequenceAlignment::programArgs::LOCAL  ||
+                                     setArg == SequenceAlignment::programArgs::SEMI_GLOBAL)
+                                     ? setArg
+                                     : request->alignmentType;
 
+            // Update alphabet pointers.
             bool isDna = (request->sequenceType == SequenceAlignment::programArgs::DNA);
             request->alphabet = isDna ? SequenceAlignment::DNA_ALPHABET
                                       : SequenceAlignment::PROTEIN_ALPHABET;
@@ -202,6 +209,12 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
         std::cerr << SequenceAlignment::SEQ_NOT_READ_ERROR << SequenceAlignment::USAGE;
         return -1;
     }
+    else if (request->textNumBytes < request->patternNumBytes)
+    {
+        std::cerr << SequenceAlignment::TEXT_SHORTER_THAN_PATTERN_ERROR;
+        return -1;
+    }
+
 
     if (scoreMatrixState != flagState::READ)
     {

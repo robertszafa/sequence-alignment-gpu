@@ -86,27 +86,23 @@ TEST_CASE("parseArguments")
     std::cerr.rdbuf(old);
 }
 
-TEST_CASE("alignSequenceCPU")
+TEST_CASE("alignSequenceGlobalCPU")
 {
 
     SECTION("DNA_01")
     {
-        const int argc = 7;
-        const char *argv[argc] = { "./alignSequence",  "--gap-open", "5", "--gap-extend", "1",
+        const int argc = 8;
+        const char *argv[argc] = { "./alignSequence",  "--gap-open", "5", "--gap-extend", "1", "--global",
                                 "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
         SequenceAlignment::Request request = {};
         SequenceAlignment::Response response;
         parseArguments(argc, argv, &request);
 
-        SequenceAlignment::alignSequenceCPU(request, &response);
+        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
 
-        const std::string expectedAlignedText = "AC-AC";
-        const std::string expectedAlignedPattern = "CCTA-";
-
-        REQUIRE(expectedAlignedText == std::string(response.alignedTextBytes,
-                                                response.alignedTextBytes + response.numAlignmentBytes));
-        REQUIRE(expectedAlignedPattern == std::string(response.alignedPatternBytes,
-                                                    response.alignedPatternBytes + response.numAlignmentBytes));
+        // Don't check the aligned sequences since there can be multiple alignments with the same score.
+        const int expectedScore = -4;
+        REQUIRE(expectedScore == response.score);
     }
 
     SECTION("DNA_02")
@@ -114,10 +110,11 @@ TEST_CASE("alignSequenceCPU")
         SequenceAlignment::Request request;
         SequenceAlignment::Response response;
 
-        const std::string text = "TTCGCCT";
-        const std::string pattern = "CTCGGTC";
+        const std::string text = "GCCT";
+        const std::string pattern = "GGTC";
         request.deviceType = SequenceAlignment::programArgs::CPU;
         request.sequenceType = SequenceAlignment::programArgs::DNA;
+        request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
         request.alphabet = SequenceAlignment::DNA_ALPHABET;
         request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
         request.gapOpenScore = -5;
@@ -128,20 +125,42 @@ TEST_CASE("alignSequenceCPU")
         validateAndTransform(pattern, request.alphabet, request.alphabetSize, request.patternBytes);
         parseScoreMatrixFile(SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
 
-        SequenceAlignment::alignSequenceCPU(request, &response);
+        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
 
-        const std::string expectedAlignedText = "TTCG--CCT";
-        const std::string expectedAlignedPattern  ="CTCGGTC--";
-        const int expectedScore = 10;
-
+        // Don't check the aligned sequences since there can be multiple alignments with the same score.
+        const int expectedScore = -2;
         REQUIRE(expectedScore == response.score);
-        REQUIRE(expectedAlignedText == std::string(response.alignedTextBytes,
-                                                response.alignedTextBytes + response.numAlignmentBytes));
-        REQUIRE(expectedAlignedPattern == std::string(response.alignedPatternBytes,
-                                                    response.alignedPatternBytes + response.numAlignmentBytes));
     }
 
     SECTION("DNA_03")
+    {
+        SequenceAlignment::Request request;
+        SequenceAlignment::Response response;
+
+        const std::string text = "TTCGCCT";
+        const std::string pattern = "CTCGGTC";
+        request.deviceType = SequenceAlignment::programArgs::CPU;
+        request.sequenceType = SequenceAlignment::programArgs::DNA;
+        request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
+        request.alphabet = SequenceAlignment::DNA_ALPHABET;
+        request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
+        request.gapOpenScore = -5;
+        request.gapExtendScore = -1;
+        request.textNumBytes = text.length();
+        request.patternNumBytes = pattern.length();
+        validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
+        validateAndTransform(pattern, request.alphabet, request.alphabetSize, request.patternBytes);
+        parseScoreMatrixFile(SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
+
+        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+
+        // Don't check the aligned sequences since there can be multiple alignments with the same score.
+        const int expectedScore = 4;
+        REQUIRE(expectedScore == response.score);
+    }
+
+    // TODO: CHeck this.
+    SECTION("DNA_04")
     {
         SequenceAlignment::Request request;
         SequenceAlignment::Response response;
@@ -153,6 +172,7 @@ TEST_CASE("alignSequenceCPU")
 
         request.deviceType = SequenceAlignment::programArgs::CPU;
         request.sequenceType = SequenceAlignment::programArgs::DNA;
+        request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
         request.alphabet = SequenceAlignment::DNA_ALPHABET;
         request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
         request.gapOpenScore = -5;
@@ -163,18 +183,29 @@ TEST_CASE("alignSequenceCPU")
         validateAndTransform(pattern, request.alphabet, request.alphabetSize, request.patternBytes);
         parseScoreMatrixFile(SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
 
-        SequenceAlignment::alignSequenceCPU(request, &response);
+        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
 
-        const std::string expectedAlignedText =
-            "ATGAAGTTGTTCGCCTTACTTTTAATTCTACTCTCTCCTCGAGATTCGT-CC-------GCTG-A--AAAATCTC--TCAGCG------------------";
-        const std::string expectedAlignedPattern =
-            "--------------CATA-----AA----ACTCTC-GGTCGGGCTTAGTACCAGGACCGGC-GCACCAGAGTGTCAATCA-CGACCCTTCACACTTTGTGC";
-        const int expectedScore = 74;
+        std::cout << std::string(response.alignedTextBytes, response.alignedTextBytes + response.numAlignmentBytes) << "\n";
+        std::cout << std::string(response.alignedPatternBytes, response.alignedPatternBytes + response.numAlignmentBytes) << "\n";
 
+        // Don't check the aligned sequences since there can be multiple alignments with the same score.
+        const int expectedScore = 53;
         REQUIRE(expectedScore == response.score);
-        REQUIRE(expectedAlignedText == std::string(response.alignedTextBytes,
-                                                response.alignedTextBytes + response.numAlignmentBytes));
-        REQUIRE(expectedAlignedPattern == std::string(response.alignedPatternBytes,
-                                                    response.alignedPatternBytes + response.numAlignmentBytes));
     }
+
+    // SECTION("DNA_05")
+    // {
+    //     const int argc = 7;
+    //     const char *argv[argc] = {"./alignSequence",  "--gap-open", "5", "--gap-extend", "1",
+    //                               "data/dna/NC_018874.txt", "data/dna/NC_018874_mutaded.txt"};
+    //     SequenceAlignment::Request request = {};
+    //     SequenceAlignment::Response response;
+    //     parseArguments(argc, argv, &request);
+
+    //     SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+
+    //     // Don't check the aligned sequences since there can be multiple alignments with the same score.
+    //     const int expectedScore = 5535;
+    //     REQUIRE(expectedScore == response.score);
+    // }
 }
