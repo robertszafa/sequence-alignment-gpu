@@ -103,15 +103,13 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
     request->alignmentType = SequenceAlignment::DEFAULT_ALIGNMENT_TYPE;
     request->alphabet = SequenceAlignment::DEFAULT_ALPHABET;
     request->alphabetSize = SequenceAlignment::DEFAULT_ALPHABET_SIZE;
-    request->gapOpenScore = SequenceAlignment::DEFAULT_GAP_OPEN_SCORE;
-    request->gapExtendScore = SequenceAlignment::DEFAULT_GAP_EXTEND_SCORE;
+    request->gapPenalty = SequenceAlignment::DEFAULT_GAP_PENALTY;
     request->textNumBytes = 0;
     request->patternNumBytes = 0;
 
     enum flagState {NOT_READ, TO_READ, READ};
     flagState scoreMatrixState = flagState::NOT_READ;
-    flagState gapOpenState = flagState::NOT_READ;
-    flagState gapExtendState = flagState::NOT_READ;
+    flagState gapPenaltyState = flagState::NOT_READ;
     for (int i = 1; i < argc; ++i)
     {
         // Check if it's a flag.
@@ -143,38 +141,22 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
             scoreMatrixState = (setArg == SequenceAlignment::programArgs::SCORE_MATRIX)
                                ? flagState::TO_READ
                                : scoreMatrixState;
-            gapOpenState = (setArg == SequenceAlignment::programArgs::GAP_OPEN)
-                           ? flagState::TO_READ
-                           : gapOpenState;
-            gapExtendState = (setArg == SequenceAlignment::programArgs::GAP_EXTEND)
-                             ? flagState::TO_READ
-                             : gapExtendState;
+            gapPenaltyState = (setArg == SequenceAlignment::programArgs::GAP_PENALTY)
+                              ? flagState::TO_READ
+                              : gapPenaltyState;
         }
-        else if (gapOpenState == flagState::TO_READ)
+        else if (gapPenaltyState == flagState::TO_READ)
         {
             try
             {
-                request->gapOpenScore = -std::stoi(argv[i]);
+                request->gapPenalty = std::stoi(argv[i]);
             }
             catch (...) // std::invalid_argument, std::out_of_range
             {
-                std::cerr << SequenceAlignment::GAP_OPEN_NOT_READ_ERROR;
+                std::cerr << SequenceAlignment::GAP_PENALTY_NOT_READ_ERROR;
                 return -1;
             }
-            gapOpenState = flagState::READ;
-        }
-        else if (gapExtendState == flagState::TO_READ)
-        {
-            try
-            {
-                request->gapExtendScore = -std::stoi(argv[i]);
-            }
-            catch (...) // std::invalid_argument, std::out_of_range
-            {
-                std::cerr << SequenceAlignment::GAP_EXTEND_NOT_READ_ERROR;
-                return -1;
-            }
-            gapExtendState = flagState::READ;
+            gapPenaltyState = flagState::READ;
         }
         // Files to read
         else if (scoreMatrixState == flagState::TO_READ)
