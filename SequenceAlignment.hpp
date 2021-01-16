@@ -102,16 +102,8 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         int score;
     };
 
-    /// A structure representing a cell in the alignment matrix.
-    struct alignPoint
-    {
-        int score; bool isFromLeft; bool isFromDiag; bool isFromTop;
-    };
-
 
     void alignSequenceGlobalCPU(const Request&, Response*);
-
-    void traceBack(const alignPoint*, const unsigned int, const unsigned int, const Request&, Response*);
 
 } // namespace SequenceAlignment
 

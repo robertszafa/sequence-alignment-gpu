@@ -4,10 +4,12 @@
 #include <iterator>
 
 
-void SequenceAlignment::traceBack(const alignPoint *alignMatrix,
-                                  const unsigned int numRows, const unsigned int numCols,
-                                  const SequenceAlignment::Request &request,
-                                  SequenceAlignment::Response *response)
+/// A structure representing a cell in the alignment matrix.
+struct alignPoint { int score; bool isFromLeft; bool isFromDiag; bool isFromTop; };
+
+
+void traceBack(const alignPoint *alignMatrix, const unsigned int numRows, const unsigned int numCols,
+               const SequenceAlignment::Request &request, SequenceAlignment::Response *response)
 {
     int curr = numRows * numCols - 1;
     int textIndex = request.textNumBytes - 1;
