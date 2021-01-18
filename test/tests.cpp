@@ -157,7 +157,6 @@ TEST_CASE("alignSequenceGlobalCPU")
         REQUIRE(expectedScore == response.score);
     }
 
-    // TODO: CHeck this.
     SECTION("DNA_04")
     {
         SequenceAlignment::Request request;
@@ -214,4 +213,63 @@ TEST_CASE("alignSequenceGlobalCPU")
         const int expectedScore = 2673;
         REQUIRE(expectedScore == response.score);
     }
+
+
+    SECTION("PROTEIN_01")
+    {
+        SequenceAlignment::Request request;
+        SequenceAlignment::Response response;
+
+        const std::string text =
+            "MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSHGSAQVKGHGKKVADALTNAVAHVDDMPNALSALSDLHAHKLRVDPVNFKLLSHCLLVTLAAHLPAEFTPAVHASLDKFLASVSTVLTSKYR";
+        const std::string pattern =
+            "MVLSGEDKSNIKAAWGKIGGHGAEYGAEALERMFASFPTTKTYFPHFDVSHGSAQVKGHGKKVADALASAAGHLDDLPGALSALSDLHAHKLRVDPVNFKLLSHCLLVTLASHHPADFTPAVHASLDKFLASVSTVLTSKYR";
+        // There may be multiple alignments with the same score. These expected alignments
+        // are for regression testing.
+        const std::string expectedAlignedText =
+            "MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSHGSAQVKGHGKKVADALTNAVAHVDDMPNALSALSDLHAHKLRVDPVNFKLLSHCLLVTLAAHLPAEFTPAVHASLDKFLASVSTVLTSKYR";
+        const std::string expectedAlignedPattern =
+            "MVLSGEDKSNIKAAWGKIGGHGAEYGAEALERMFASFPTTKTYFPHFDVSHGSAQVKGHGKKVADALASAAGHLDDLPGALSALSDLHAHKLRVDPVNFKLLSHCLLVTLASHHPADFTPAVHASLDKFLASVSTVLTSKYR";
+        const int expectedScore = 821;
+
+        request.deviceType = SequenceAlignment::programArgs::CPU;
+        request.sequenceType = SequenceAlignment::programArgs::PROTEIN;
+        request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
+        request.alphabet = SequenceAlignment::PROTEIN_ALPHABET;
+        request.alphabetSize = SequenceAlignment::NUM_PROTEIN_CHARS;
+        request.gapPenalty = 5;
+        request.textNumBytes = text.length();
+        request.patternNumBytes = pattern.length();
+        validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
+        validateAndTransform(pattern, request.alphabet, request.alphabetSize, request.patternBytes);
+        parseScoreMatrixFile(SequenceAlignment::DEFAULT_PROTEIN_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
+
+        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+
+        auto gotAlignedText = std::string(response.alignedTextBytes,
+                                          (response.alignedTextBytes + response.numAlignmentBytes));
+        auto gotAlignedPattern = std::string(response.alignedPatternBytes,
+                                             (response.alignedPatternBytes + response.numAlignmentBytes));
+
+        REQUIRE(expectedScore == response.score);
+        REQUIRE(expectedAlignedText == gotAlignedText);
+        REQUIRE(expectedAlignedPattern == gotAlignedPattern);
+    }
+
+    SECTION("PROTEIN_02")
+    {
+        const int argc = 7;
+        const char *argv[argc] = {"./alignSequence", "--protein", "--gap-penalty", "5", "--global",
+                                  "data/protein/P0C6B8.txt", "data/protein/P0C6B8_mutated.txt"};
+        SequenceAlignment::Request request = {};
+        SequenceAlignment::Response response;
+        parseArguments(argc, argv, &request);
+
+        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+
+        // Don't check the aligned sequences since there can be multiple alignments with the same score.
+        const int expectedScore = 32095;
+        REQUIRE(expectedScore == response.score);
+    }
+
 }
