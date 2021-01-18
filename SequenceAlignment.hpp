@@ -52,12 +52,12 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         "error: gap penalty not read. Only integer scores accepted (-32,768 to 32,767)\n";
 
     const unsigned int NUM_DNA_CHARS = 4;
-    const unsigned int NUM_PROTEIN_CHARS = 24;
+    const unsigned int NUM_PROTEIN_CHARS = 23;
     /// The order of scores in a file with a scoring matrix is fixed ('*' represents a gap).
     /// Characters are transformed into ordered integers, e.g. for DNA A->0, T->1, C->3, ...
     const char DNA_ALPHABET[] =  {'A', 'T', 'C', 'G', '-'};
     const char PROTEIN_ALPHABET[] =  {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K',
-                                      'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'B', 'J', 'Z', 'X', '-'};
+                                      'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'B', 'Z', 'X', '-'};
 
     const unsigned int MAX_SEQUENCE_LEN = 8192;
 
