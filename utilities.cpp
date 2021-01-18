@@ -1,6 +1,7 @@
 #include "SequenceAlignment.hpp"
 
 #include <iostream>
+#include <iomanip>
 #include <algorithm>
 #include <fstream>
 
@@ -209,3 +210,48 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
     return 0;
 }
 
+
+void prettyAlignmentPrint(const char* text, const char* pattern, const int numChars,
+                          std::ostream& stream)
+{
+    const unsigned int CHARS_PER_LINE = 50;
+
+    int charNumWidth = 0;
+    int maxI = numChars;
+    do { maxI /= 10; ++charNumWidth; } while (maxI != 0);
+
+    for (int i = 0; i < numChars; i += CHARS_PER_LINE)
+    {
+        stream << std::setfill(' ') << std::setw(charNumWidth) << (i + 1) << " "
+               << std::resetiosflags(std::ios::showbase);
+
+        int j = i;
+        for (j = i;j < (i+CHARS_PER_LINE) && j < numChars; j++)
+        {
+            stream << text[j];
+        }
+        stream << "   " << j
+               << " \n" << std::setfill(' ') << std::setw(charNumWidth) << " " << " "
+               << std::resetiosflags(std::ios::showbase);
+
+
+        for (j = i; j < (i+CHARS_PER_LINE) && j < numChars; j++)
+        {
+            if (text[j] == pattern[j])
+                stream << '|';
+            else if (text[j] == '-' || pattern[j] == '-')
+                stream << ' ';
+            else
+                stream << '.';
+        }
+        stream << "\n" << std::setfill(' ') << std::setw(charNumWidth) << (i + 1) << " "
+               << std::resetiosflags(std::ios::showbase);
+
+        for (j = i; j < (i+CHARS_PER_LINE) && j < numChars; j++)
+        {
+            stream << pattern[j];
+        }
+
+        stream << "   " << j << "\n\n";
+    }
+}

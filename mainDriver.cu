@@ -19,8 +19,8 @@ int main(int argc, const char *argv[])
         request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
         SequenceAlignment::alignSequenceGlobalCPU(request, &response);
 
-    std::cout << std::string(response.alignedTextBytes, (response.alignedTextBytes + response.numAlignmentBytes)) << "\n";
-    std::cout << std::string(response.alignedPatternBytes, (response.alignedPatternBytes + response.numAlignmentBytes)) << "\n";
+    prettyAlignmentPrint(response.alignedTextBytes, response.alignedPatternBytes,
+                         response.numAlignmentBytes, std::cout);
     std::cout << "Score: " << response.score << "\n";
 
     return 0;
