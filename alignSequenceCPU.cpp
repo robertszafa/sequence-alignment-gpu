@@ -20,34 +20,35 @@ void traceBack(const alignPoint *alignMatrix, const unsigned int numRows, const 
 
     while (curr != 0)
     {
+        // Was it a match, gap in text or gap in pattern?
         const bool takeText = (alignMatrix[curr].isFromDiag || alignMatrix[curr].isFromLeft);
         const bool takePattern = (alignMatrix[curr].isFromDiag || alignMatrix[curr].isFromTop);
 
+        // Translate from alphabet indexes to alphabet letters.
+        const char translatedText = request.alphabet[request.textBytes[textIndex]];
+        const char translatedPattern = request.alphabet[request.patternBytes[patternIndex]];
+        const char GAP = request.alphabet[request.alphabetSize];
+
         response->alignedTextBytes[response->numAlignmentBytes] =
-            takeText * request.textBytes[textIndex] + (!takeText) * request.alphabetSize;
+            takeText * translatedText + (!takeText) * GAP;
         response->alignedPatternBytes[response->numAlignmentBytes] =
-            takePattern * request.patternBytes[patternIndex] + (!takePattern) * request.alphabetSize;
+            takePattern * translatedPattern + (!takePattern) * GAP;
 
         response->numAlignmentBytes += 1;
 
-        // Saturate at 0.
+        // Update text and pattern indices depending which one was used.
         textIndex = std::max(0, textIndex - takeText);
         patternIndex = std::max(0, patternIndex - takePattern);
+        // Go to next cell.
         curr -= (alignMatrix[curr].isFromLeft) +
                 (alignMatrix[curr].isFromDiag * (numCols+1)) +
                 (alignMatrix[curr].isFromTop * (numCols));
     }
 
-    // Reverse and tranform from alphabet indexes to alphabet elements.
     std::reverse(response->alignedTextBytes,
                  (response->alignedTextBytes + response->numAlignmentBytes));
     std::reverse(response->alignedPatternBytes,
                  (response->alignedPatternBytes + response->numAlignmentBytes));
-    for (int i=0; i<response->numAlignmentBytes; ++i)
-    {
-        response->alignedTextBytes[i] = request.alphabet[response->alignedTextBytes[i]];
-        response->alignedPatternBytes[i] = request.alphabet[response->alignedPatternBytes[i]];
-    }
 }
 
 

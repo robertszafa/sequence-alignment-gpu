@@ -211,47 +211,60 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
 }
 
 
-void prettyAlignmentPrint(const char* text, const char* pattern, const int numChars,
-                          std::ostream& stream)
+void prettyAlignmentPrint(SequenceAlignment::Response &response, std::ostream& stream)
 {
     const unsigned int CHARS_PER_LINE = 50;
 
     int charNumWidth = 0;
-    int maxI = numChars;
+    int maxI = response.numAlignmentBytes;
     do { maxI /= 10; ++charNumWidth; } while (maxI != 0);
 
-    for (int i = 0; i < numChars; i += CHARS_PER_LINE)
+    int numIdentity = 0, numGaps = 0;
+    for (int i = 0; i < response.numAlignmentBytes; i += CHARS_PER_LINE)
     {
         stream << std::setfill(' ') << std::setw(charNumWidth) << (i + 1) << " "
                << std::resetiosflags(std::ios::showbase);
 
         int j = i;
-        for (j = i;j < (i+CHARS_PER_LINE) && j < numChars; j++)
+        for (j = i;j < (i+CHARS_PER_LINE) && j < response.numAlignmentBytes; j++)
         {
-            stream << text[j];
+            stream << response.alignedTextBytes[j];
         }
         stream << "   " << j
                << " \n" << std::setfill(' ') << std::setw(charNumWidth) << " " << " "
                << std::resetiosflags(std::ios::showbase);
 
 
-        for (j = i; j < (i+CHARS_PER_LINE) && j < numChars; j++)
+        for (j = i; j < (i+CHARS_PER_LINE) && j < response.numAlignmentBytes; j++)
         {
-            if (text[j] == pattern[j])
+            if (response.alignedTextBytes[j] == response.alignedPatternBytes[j])
+            {
                 stream << '|';
-            else if (text[j] == '-' || pattern[j] == '-')
+                ++numIdentity;
+            }
+            else if (response.alignedTextBytes[j] == '-' || response.alignedPatternBytes[j] == '-')
+            {
                 stream << ' ';
+                ++numGaps;
+            }
             else
                 stream << '.';
         }
         stream << "\n" << std::setfill(' ') << std::setw(charNumWidth) << (i + 1) << " "
                << std::resetiosflags(std::ios::showbase);
 
-        for (j = i; j < (i+CHARS_PER_LINE) && j < numChars; j++)
+        for (j = i; j < (i+CHARS_PER_LINE) && j < response.numAlignmentBytes; j++)
         {
-            stream << pattern[j];
+            stream << response.alignedPatternBytes[j];
         }
 
         stream << "   " << j << "\n\n";
     }
+
+    stream << "# Length: \t" << response.numAlignmentBytes << "\n"
+           << "# Identity: \t" <<  numIdentity << "/" << response.numAlignmentBytes << std::setprecision(3)
+                             << " (" << (numIdentity/(response.numAlignmentBytes*1.0)*100) << "%)\n"
+           << "# Gaps: \t" <<  numGaps << "/" << response.numAlignmentBytes << std::setprecision(3)
+                             << " (" << (numGaps/(response.numAlignmentBytes*1.0)*100) << "%)\n"
+           << "# Score: \t" << response.score << "\n";
 }
