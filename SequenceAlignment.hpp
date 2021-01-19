@@ -42,8 +42,8 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
        --local               - use local alignment\n\
        -s, --score-matrix    - next argument is a score matrix file\n\
        --gap-penalty         - [int] next argument is a gap open penalty (default 5)\n";
-    const std::string SEQ_NOT_READ_ERROR =
-        "error: text sequence or pattern sequence not read\n";
+    const std::string SEQ_NOT_READ_ERROR = "error: text sequence or pattern sequence not read\n";
+    const std::string MEM_ERROR = "error: sequence is too long, not enough memory\n";
     const std::string TEXT_SHORTER_THAN_PATTERN_ERROR =
         "error: text sequence cannot be shorter than the pattern sequence.\n";
     const std::string SCORE_MATRIX_NOT_READ_ERROR =
@@ -81,9 +81,9 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         /// What is the type of the aignment algorithm.
         programArgs alignmentType;
         /// Buffer holding the text sequence.
-        char textBytes[MAX_SEQUENCE_LEN]; int textNumBytes;
+        char *textBytes; int textNumBytes;
         /// Buffer holding the pattern sequence.
-        char patternBytes[MAX_SEQUENCE_LEN]; int patternNumBytes;
+        char *patternBytes; int patternNumBytes;
         /// Alphabet of the sequence.
         const char *alphabet; int alphabetSize;
         /// Substitution matrix stored in row major order.
@@ -95,9 +95,9 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     struct Response
     {
         /// Buffer holding the aligned text sequence.
-        char alignedTextBytes[MAX_SEQUENCE_LEN*2];
+        char *alignedTextBytes;
         /// Buffer holding the aligned pattern sequence.
-        char alignedPatternBytes[MAX_SEQUENCE_LEN*2];
+        char *alignedPatternBytes;
         int numAlignmentBytes;
         int score;
     };

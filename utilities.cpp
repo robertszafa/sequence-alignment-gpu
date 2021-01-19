@@ -24,8 +24,10 @@ int getScore(char char1, char char2, const char *alphabet, const int alphabetSiz
     return scoreMatrix[idx];
 }
 
-int validateAndTransform(const std::string &sequence, const char *alphabet, const int alphabetSize,
-                         char *dstBuffer)
+/// Given a string of letters:
+///     - remove character, if not in the alphabet
+///     - transorm character into i where character=alphabet[i], if not in the alphabet
+int validateAndTransform(std::string &sequence, const char *alphabet, const int alphabetSize)
 {
     unsigned int numRead = 0;
     for (int i=0; i<sequence.length(); ++i)
@@ -34,11 +36,11 @@ int validateAndTransform(const std::string &sequence, const char *alphabet, cons
         // Ignore characters not on the A-Z range.
         if (upperLetter < 65 || upperLetter > 90) continue;
 
-        dstBuffer[numRead] = indexOfLetter(upperLetter, alphabet, alphabetSize);
-        if (dstBuffer[numRead] == -1)
+        sequence[numRead] = indexOfLetter(upperLetter, alphabet, alphabetSize);
+        if (sequence[numRead] == -1)
         {
             std::cerr << "'" << sequence[i] << "'" << " letter not in alphabet." << std::endl;
-            return -1;
+            return 0;
         }
 
         ++numRead;
@@ -47,21 +49,45 @@ int validateAndTransform(const std::string &sequence, const char *alphabet, cons
     return numRead;
 }
 
-/// Given a filename, copy the chars (bytes) from the file into a buffer.
-/// Return the number of bytes read or -1 if an error occured.
-int readSequenceBytes(const std::string fname,  const char *alphabet, const int alphabetSize,
-                      char *dstBuffer)
+int readSequenceFile(const std::string fname, SequenceAlignment::Request *request)
 {
     std::ifstream f(fname);
+    std::string fileContents = "";
     if (f.good())
-    {
         // Use string's range constructor to copy over entire file to memory.
-        std::string fileString((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-        return validateAndTransform(fileString, alphabet, alphabetSize, dstBuffer);
+        fileContents = std::string((std::istreambuf_iterator<char>(f)),
+                                    std::istreambuf_iterator<char>());
+    else
+    {
+        std::cerr << fname << " file does not exist" << std::endl;
+        return -1;
     }
 
-    std::cerr << fname << " file does not exist" << std::endl;
-    return -1;
+    int numLetters = validateAndTransform(fileContents, request->alphabet, request->alphabetSize);
+    try
+    {
+        if (request->textNumBytes == 0 && numLetters > 0)
+        {
+            // Allocate memory for buffer and copy the normalised sequence.
+            request->textBytes = new char[numLetters];
+            request->textNumBytes = numLetters;
+            std::copy_n(fileContents.begin(), numLetters, request->textBytes);
+        }
+        else if (request->patternNumBytes == 0 && numLetters > 0)
+        {
+            // Allocate memory for buffer and copy the normalised sequence.
+            request->patternBytes = new char[numLetters];
+            request->patternNumBytes = numLetters;
+            std::copy_n(fileContents.begin(), numLetters, request->patternBytes);
+        }
+    }
+    catch (const std::bad_alloc& e)
+    {
+        std::cerr << SequenceAlignment::MEM_ERROR;
+        return -1;
+    }
+
+    return 0;
 }
 
 int parseScoreMatrixFile(const std::string& fname, const int alphabetSize, short *buffer)
@@ -159,7 +185,6 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
             }
             gapPenaltyState = flagState::READ;
         }
-        // Files to read
         else if (scoreMatrixState == flagState::TO_READ)
         {
             if (parseScoreMatrixFile(argv[i], request->alphabetSize, request->scoreMatrix) == -1)
@@ -171,17 +196,9 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
         }
         else
         {
-            if (request->textNumBytes == 0)
-                request->textNumBytes = readSequenceBytes(argv[i], request->alphabet,
-                                                          request->alphabetSize, request->textBytes);
-            else if (request->patternNumBytes == 0)
-                request->patternNumBytes = readSequenceBytes(argv[i], request->alphabet,
-                                                          request->alphabetSize, request->patternBytes);
-
-            // Check if read correctly.
-            if (request->textNumBytes == -1 || request->patternNumBytes == -1)
+            if (readSequenceFile(argv[i], request) == -1)
             {
-                std::cerr << SequenceAlignment::SEQ_NOT_READ_ERROR << SequenceAlignment::USAGE;
+                std::cerr << SequenceAlignment::SEQ_NOT_READ_ERROR;
                 return -1;
             }
         }
@@ -211,8 +228,10 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
 }
 
 
-void prettyAlignmentPrint(SequenceAlignment::Response &response, std::ostream& stream)
+void prettyAlignmentPrint(SequenceAlignment::Response &response, std::ostream &stream)
 {
+    if (response.numAlignmentBytes == 0) return;
+
     const unsigned int CHARS_PER_LINE = 50;
 
     int charNumWidth = 0;

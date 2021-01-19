@@ -110,18 +110,20 @@ TEST_CASE("alignSequenceGlobalCPU")
         SequenceAlignment::Request request;
         SequenceAlignment::Response response;
 
-        const std::string text = "GCCT";
-        const std::string pattern = "GGTC";
+        std::string text = "GCCT";
+        std::string pattern = "GGTC";
         request.deviceType = SequenceAlignment::programArgs::CPU;
         request.sequenceType = SequenceAlignment::programArgs::DNA;
         request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
         request.alphabet = SequenceAlignment::DNA_ALPHABET;
         request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
         request.gapPenalty = 5;
-        request.textNumBytes = text.length();
-        request.patternNumBytes = pattern.length();
-        validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
-        validateAndTransform(pattern, request.alphabet, request.alphabetSize, request.patternBytes);
+        request.textNumBytes = validateAndTransform(text, request.alphabet, request.alphabetSize);
+        request.textBytes = new char[request.textNumBytes];
+        std::copy_n(text.begin(), request.textNumBytes, request.textBytes);
+        request.patternNumBytes = validateAndTransform(pattern, request.alphabet, request.alphabetSize);
+        request.patternBytes = new char[request.patternNumBytes];
+        std::copy_n(pattern.begin(), request.patternNumBytes, request.patternBytes);
         parseScoreMatrixFile(SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
 
         SequenceAlignment::alignSequenceGlobalCPU(request, &response);
@@ -136,18 +138,20 @@ TEST_CASE("alignSequenceGlobalCPU")
         SequenceAlignment::Request request;
         SequenceAlignment::Response response;
 
-        const std::string text = "TTCGCCT";
-        const std::string pattern = "CTCGGTC";
+        std::string text = "TTCGCCT";
+        std::string pattern = "CTCGGTC";
         request.deviceType = SequenceAlignment::programArgs::CPU;
         request.sequenceType = SequenceAlignment::programArgs::DNA;
         request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
         request.alphabet = SequenceAlignment::DNA_ALPHABET;
         request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
         request.gapPenalty = 5;
-        request.textNumBytes = text.length();
-        request.patternNumBytes = pattern.length();
-        validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
-        validateAndTransform(pattern, request.alphabet, request.alphabetSize, request.patternBytes);
+        request.textNumBytes = validateAndTransform(text, request.alphabet, request.alphabetSize);
+        request.textBytes = new char[request.textNumBytes];
+        std::copy_n(text.begin(), request.textNumBytes, request.textBytes);
+        request.patternNumBytes = validateAndTransform(pattern, request.alphabet, request.alphabetSize);
+        request.patternBytes = new char[request.patternNumBytes];
+        std::copy_n(pattern.begin(), request.patternNumBytes, request.patternBytes);
         parseScoreMatrixFile(SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
 
         SequenceAlignment::alignSequenceGlobalCPU(request, &response);
@@ -162,9 +166,9 @@ TEST_CASE("alignSequenceGlobalCPU")
         SequenceAlignment::Request request;
         SequenceAlignment::Response response;
 
-        const std::string text =
+        std::string text =
             "CATAAAACTCTCGGTCGGGCTTAGTACCAGGACCGGCGCACCAGAGTGTCAATCACGACCCTTCACACTTTGTGC";
-        const std::string pattern =
+        std::string pattern =
             "ATGAAGTTGTTCGCCTTACTTTTAATTCTACTCTCTCCTCGAGATTCGTCCGCTGAAAAATCTCTCAGCG";
         // There may be multiple alignments with the same score. These expected alignments
         // are for regression testing.
@@ -180,10 +184,12 @@ TEST_CASE("alignSequenceGlobalCPU")
         request.alphabet = SequenceAlignment::DNA_ALPHABET;
         request.alphabetSize = SequenceAlignment::NUM_DNA_CHARS;
         request.gapPenalty = 5;
-        request.textNumBytes = text.length();
-        request.patternNumBytes = pattern.length();
-        validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
-        validateAndTransform(pattern, request.alphabet, request.alphabetSize, request.patternBytes);
+        request.textNumBytes = validateAndTransform(text, request.alphabet, request.alphabetSize);
+        request.textBytes = new char[request.textNumBytes];
+        std::copy_n(text.begin(), request.textNumBytes, request.textBytes);
+        request.patternNumBytes = validateAndTransform(pattern, request.alphabet, request.alphabetSize);
+        request.patternBytes = new char[request.patternNumBytes];
+        std::copy_n(pattern.begin(), request.patternNumBytes, request.patternBytes);
         parseScoreMatrixFile(SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
 
         SequenceAlignment::alignSequenceGlobalCPU(request, &response);
@@ -220,9 +226,9 @@ TEST_CASE("alignSequenceGlobalCPU")
         SequenceAlignment::Request request;
         SequenceAlignment::Response response;
 
-        const std::string text =
+        std::string text =
             "MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSHGSAQVKGHGKKVADALTNAVAHVDDMPNALSALSDLHAHKLRVDPVNFKLLSHCLLVTLAAHLPAEFTPAVHASLDKFLASVSTVLTSKYR";
-        const std::string pattern =
+        std::string pattern =
             "MVLSGEDKSNIKAAWGKIGGHGAEYGAEALERMFASFPTTKTYFPHFDVSHGSAQVKGHGKKVADALASAAGHLDDLPGALSALSDLHAHKLRVDPVNFKLLSHCLLVTLASHHPADFTPAVHASLDKFLASVSTVLTSKYR";
         // There may be multiple alignments with the same score. These expected alignments
         // are for regression testing.
@@ -238,10 +244,12 @@ TEST_CASE("alignSequenceGlobalCPU")
         request.alphabet = SequenceAlignment::PROTEIN_ALPHABET;
         request.alphabetSize = SequenceAlignment::NUM_PROTEIN_CHARS;
         request.gapPenalty = 5;
-        request.textNumBytes = text.length();
-        request.patternNumBytes = pattern.length();
-        validateAndTransform(text, request.alphabet, request.alphabetSize, request.textBytes);
-        validateAndTransform(pattern, request.alphabet, request.alphabetSize, request.patternBytes);
+        request.textNumBytes = validateAndTransform(text, request.alphabet, request.alphabetSize);
+        request.textBytes = new char[request.textNumBytes];
+        std::copy_n(text.begin(), request.textNumBytes, request.textBytes);
+        request.patternNumBytes = validateAndTransform(pattern, request.alphabet, request.alphabetSize);
+        request.patternBytes = new char[request.patternNumBytes];
+        std::copy_n(pattern.begin(), request.patternNumBytes, request.patternBytes);
         parseScoreMatrixFile(SequenceAlignment::DEFAULT_PROTEIN_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
 
         SequenceAlignment::alignSequenceGlobalCPU(request, &response);
