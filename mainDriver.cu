@@ -17,6 +17,10 @@ int main(int argc, const char *argv[])
         request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
         SequenceAlignment::alignSequenceGlobalCPU(request, &response);
 
+    if (request.deviceType == SequenceAlignment::programArgs::GPU &&
+        request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
+        SequenceAlignment::alignSequenceGlobalGPU(request, &response);
+
     prettyAlignmentPrint(response, std::cout);
 
     return 0;
