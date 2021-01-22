@@ -105,6 +105,8 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
 
     void alignSequenceGlobalCPU(const Request&, Response*);
 
+    void alignSequenceGlobalGPU(const Request&, Response*);
+
 } // namespace SequenceAlignment
 
 
@@ -112,3 +114,4 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
 
 #include "utilities.cpp"
 #include "alignSequenceCPU.cpp"
+#include "alignSequenceGPU.cu"

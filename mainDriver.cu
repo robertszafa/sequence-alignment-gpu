@@ -1,7 +1,5 @@
 #include "SequenceAlignment.hpp"
 
-#include <cuda.h>
-
 #include <iostream>
 #include <fstream>
 
