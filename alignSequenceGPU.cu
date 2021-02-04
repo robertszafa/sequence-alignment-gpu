@@ -12,52 +12,54 @@ __global__ void alignSequenceGlobalCUDA(const char *textBytes, const uint64_t te
                                         int *thisScores, int *prevScores)
 {
     extern __shared__ int _shared[];
-    int *_text = _shared;
-    int *_thisScores = _shared + textNumBytes;
-    int *_prevScores = _shared + textNumBytes + numCols;
+    int *_thisScores = _shared;
+    int *_prevScores = _shared + numCols;
 
-    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const int tid = threadIdx.x;
 
-    // Each thread copies one text letter, i.e. one column.
-    _text[tid] = textBytes[tid];
-    const char textByte = _text[tid];
+    // Each thread copies one text letter.
+    const char textByte = (tid > 0) ? textBytes[tid - 1] : alphabetSize;
     // Init first row.
     _thisScores[tid] = tid * -gapPenalty;
-    __syncthreads();
 
     // Dynamic programming loop.
     for (int i_pattern = 1; i_pattern < numRows; ++i_pattern)
     {
         // Advance one row.
-        int *tmp = _thisScores;
+         int *tmp = _thisScores;
         _thisScores = _prevScores;
         _prevScores = tmp;
 
         if (tid == 0)
-            _thisScores[tid] -= gapPenalty;
+        {
+            _thisScores[tid] = _prevScores[tid] - gapPenalty;
+            continue;
+        }
 
-        const char patternByte = patternBytes[i_pattern];
-        const int scoreMatrixIdx = ((int) patternByte) * alphabetSize + ((int) textByte);
+        const char patternByte = patternBytes[i_pattern - 1];
+        const int scoreMatrixIdx = ((int) textByte) * alphabetSize + ((int) patternByte);
 
+        // We are accessing the previous row - wait for all columns to finish.
+        __syncthreads();
         const int fromTopScore = _prevScores[tid] - gapPenalty;
         const int fromDiagScore = _prevScores[tid - 1] + scoreMatrix[scoreMatrixIdx];
 
         const int maxFromPrev = max(fromDiagScore, fromTopScore);
 
-        for (int i_pattern2 = 1; i_pattern2 < numRows; ++i_pattern2)
+        for (int i_text = 1; i_text < numCols; ++i_text)
         {
-            if (tid == i_pattern2)
+            // We are accessing the previous column within a row.
+            if (tid == i_text)
             {
-                const int fromLeftScore = _thisScores[tid] - gapPenalty;
+                const int fromLeftScore = _thisScores[tid - 1] - gapPenalty;
                 _thisScores[tid] = max(maxFromPrev, fromLeftScore);
             }
             __syncthreads();
         }
     }
 
-
-    thisScores[tid] = _thisScores[tid];
-    __syncthreads();
+    if (tid == (numCols - 1))
+        thisScores[tid] = _thisScores[tid];
 }
 
 
@@ -101,9 +103,10 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
         return;
     }
 
-    const unsigned int sharedMemSize = request.textNumBytes +   // text bytes buffer
-                                       sizeof(int) * numCols +  // this row scores
-                                       sizeof(int) * numCols;   // prev row scores
+    // this and prev row scores
+    const unsigned int sharedMemSize = 2 * sizeof(int) * numCols;
+    std::cout << "Num bytes in col: " << sharedMemSize << "\n";
+    std::cout << "Num cols: " << numCols << "\n";
 
     alignSequenceGlobalCUDA<<<1, numCols, sharedMemSize>>>(d_textBytes, request.textNumBytes,
                                                            d_patternBytes, request.patternNumBytes,
