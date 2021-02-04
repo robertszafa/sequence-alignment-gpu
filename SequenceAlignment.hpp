@@ -102,10 +102,14 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         int score;
     };
 
+    enum DIR { LEFT, DIAG, TOP};
+
 
     void alignSequenceGlobalCPU(const Request&, Response*);
 
     void alignSequenceGlobalGPU(const Request&, Response*);
+
+    void traceBack(const char*, const unsigned int, const unsigned int, const Request&, Response*);
 
 } // namespace SequenceAlignment
 

@@ -4,11 +4,9 @@
 #include <iterator>
 
 
-enum DIR { LEFT, DIAG, TOP};
 
-
-void traceBack(const char *M, const unsigned int numRows, const unsigned int numCols,
-               const SequenceAlignment::Request &request, SequenceAlignment::Response *response)
+void SequenceAlignment::traceBack(const char *M, const unsigned int numRows, const unsigned int numCols,
+                                  const Request &request, Response *response)
 {
     int curr = numRows * numCols - 1;
     int textIndex = request.textNumBytes - 1;
@@ -76,11 +74,12 @@ void SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request 
         std::cerr << SequenceAlignment::MEM_ERROR;
         return;
     }
+    /** End Allocate memory */
 
     // Init first row.
     for (unsigned int i_text = 0; i_text < numCols; ++i_text)
     {
-        thisRowScores[i_text] = i_text * (-request.gapPenalty);
+        thisRowScores[i_text] = i_text * -request.gapPenalty;
         M[i_text] = DIR::LEFT;
     }
 
