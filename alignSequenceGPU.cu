@@ -32,7 +32,7 @@ __global__ void alignSequenceGlobalCUDA(const char *textBytes, const uint64_t te
 
         if (tid == 0)
         {
-            _thisScores[tid] = _prevScores[tid] - gapPenalty;
+            _thisScores[tid] = -(i_pattern * gapPenalty);
             continue;
         }
 
