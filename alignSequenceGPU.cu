@@ -8,10 +8,9 @@ enum DIR { LEFT, DIAG, TOP};
 
 __global__ void alignSequenceGlobalCUDA(const char *textBytes, const uint64_t textNumBytes,
                                         const char *patternBytes, const uint64_t patternNumBytes,
-                                        const char *alphabet, const int alphabetSize,
-                                        const short *scoreMatrix, const short gapPenalty,
-                                        const int numRows, const int numCols,
-                                        int *thisScores, int *prevScores, char *M)
+                                        const short *scoreMatrix, const int alphabetSize,
+                                        const short gapPenalty, const int numRows, const int numCols,
+                                        char *M, int *finalScore)
 {
     extern __shared__ int _shared[];
     int *_thisScores = _shared;
@@ -25,6 +24,8 @@ __global__ void alignSequenceGlobalCUDA(const char *textBytes, const uint64_t te
     _thisScores[tid] = tid * -gapPenalty;
     M[tid] = DIR::LEFT;
 
+    __syncthreads();
+
     // Dynamic programming loop.
     auto thisRowM = M + numCols;
     for (int i_pattern = 1; i_pattern < numRows; ++i_pattern)
@@ -33,7 +34,6 @@ __global__ void alignSequenceGlobalCUDA(const char *textBytes, const uint64_t te
          int *tmp = _thisScores;
         _thisScores = _prevScores;
         _prevScores = tmp;
-
 
         if (tid == 0)
         {
@@ -46,11 +46,12 @@ __global__ void alignSequenceGlobalCUDA(const char *textBytes, const uint64_t te
         const int scoreMatrixIdx = ((int) textByte) * alphabetSize + ((int) patternByte);
 
         // We are accessing the previous row - wait for all columns to finish.
-        __syncthreads();
         const int fromTopScore = _prevScores[tid] - gapPenalty;
         const int fromDiagScore = _prevScores[tid - 1] + scoreMatrix[scoreMatrixIdx];
 
-        const int maxFromPrev = max(fromDiagScore, fromTopScore);
+        const bool isDiagGreaterThanTop = (fromDiagScore > fromTopScore);
+        const int maxFromPrev = isDiagGreaterThanTop ? fromDiagScore : fromTopScore;
+        const auto tmpDir = isDiagGreaterThanTop ? DIR::DIAG : DIR::TOP;
 
         for (int i_text = 1; i_text < numCols; ++i_text)
         {
@@ -58,13 +59,10 @@ __global__ void alignSequenceGlobalCUDA(const char *textBytes, const uint64_t te
             if (tid == i_text)
             {
                 const int fromLeftScore = _thisScores[tid - 1] - gapPenalty;
-                _thisScores[tid] = max(maxFromPrev, fromLeftScore);
+                const bool isPrevGreater = (maxFromPrev > fromLeftScore);
 
-                const bool isFromLeft = (fromLeftScore >= maxFromPrev);
-                const bool isFromTop = (fromTopScore > fromLeftScore) && (fromTopScore >= fromDiagScore);
-                const bool isFromDiag = (fromDiagScore > fromLeftScore) && (fromDiagScore > fromTopScore) ;
-
-                thisRowM[i_text] = (isFromLeft * DIR::LEFT + isFromDiag * DIR::DIAG + isFromTop * DIR::TOP);
+                _thisScores[tid] = isPrevGreater ? maxFromPrev : fromLeftScore;
+                thisRowM[i_text] = isPrevGreater ? tmpDir : DIR::LEFT;
             }
             __syncthreads();
         }
@@ -73,7 +71,7 @@ __global__ void alignSequenceGlobalCUDA(const char *textBytes, const uint64_t te
     }
 
     if (tid == (numCols - 1))
-        thisScores[tid] = _thisScores[tid];
+        finalScore[0] = _thisScores[tid];
 }
 
 
@@ -99,23 +97,19 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     }
     /** End Allocate host memory */
 
-    int *d_thisScores, *d_prevScores;
+    int *d_finalScore;
     short *d_scoreMatrix;
-    char *d_textBytes, *d_patternBytes, *d_alphabet;
-    char *d_M;
+    char *d_textBytes, *d_patternBytes, *d_M;
 
     /** Allocate and transfer memory */
-    if (cudaMalloc(&d_thisScores, sizeof(int) * numCols) != cudaSuccess ||
-        cudaMalloc(&d_prevScores, sizeof(int) * numCols) != cudaSuccess ||
+    if (cudaMalloc(&d_finalScore, sizeof(int)) != cudaSuccess ||
         cudaMalloc(&d_scoreMatrix, sizeof(short) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
         cudaMalloc(&d_M, numRows * numCols) != cudaSuccess ||
         cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
-        cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
-        cudaMalloc(&d_alphabet, request.alphabetSize) != cudaSuccess)
+        cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess)
     {
         std::cout << MEM_ERROR << std::endl;
-        cudaFree(d_thisScores);
-        cudaFree(d_prevScores);
+        cudaFree(d_finalScore);
         cudaFree(d_scoreMatrix);
         cudaFree(d_M);
         cudaFree(d_textBytes);
@@ -125,12 +119,10 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
 
     if (cudaMemcpy(d_textBytes, request.textBytes, request.textNumBytes, cudaMemcpyHostToDevice) != cudaSuccess ||
         cudaMemcpy(d_patternBytes, request.patternBytes, request.patternNumBytes, cudaMemcpyHostToDevice) != cudaSuccess ||
-        cudaMemcpy(d_scoreMatrix, request.scoreMatrix, sizeof(short) * (request.alphabetSize * request.alphabetSize), cudaMemcpyHostToDevice) != cudaSuccess ||
-        cudaMemcpy(d_alphabet, request.alphabet, request.alphabetSize, cudaMemcpyHostToDevice) != cudaSuccess)
+        cudaMemcpy(d_scoreMatrix, request.scoreMatrix, sizeof(short) * (request.alphabetSize * request.alphabetSize), cudaMemcpyHostToDevice) != cudaSuccess)
     {
         std::cout << MEM_ERROR << std::endl;
-        cudaFree(d_thisScores);
-        cudaFree(d_prevScores);
+        cudaFree(d_finalScore);
         cudaFree(d_scoreMatrix);
         cudaFree(d_M);
         cudaFree(d_textBytes);
@@ -140,18 +132,18 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     /** End Allocate and transfer memory */
 
     // this and prev row scores
-    const unsigned int sharedMemSize = 2 * sizeof(int) * numCols;
-    std::cout << "Num bytes in col: " << sharedMemSize << "\n";
-    std::cout << "Num cols: " << numCols << "\n";
+    const unsigned int sharedMemSize = 2 * numCols * sizeof(int);
+    // std::cout << "Num col: " << numCols << "\n";
+    // std::cout << "Num bytes in shared: " << sharedMemSize << "\n";
+    // std::cout << "Num cols: " << numCols << "\n";
 
     alignSequenceGlobalCUDA<<<1, numCols, sharedMemSize>>>(d_textBytes, request.textNumBytes,
                                                            d_patternBytes, request.patternNumBytes,
-                                                           d_alphabet, request.alphabetSize,
-                                                           d_scoreMatrix, request.gapPenalty,
-                                                           numRows, numCols,
-                                                           d_thisScores, d_prevScores, d_M);
+                                                           d_scoreMatrix, request.alphabetSize,
+                                                           request.gapPenalty, numRows, numCols,
+                                                           d_M, d_finalScore);
 
-    if (cudaMemcpy(&(response->score), (d_thisScores + numCols - 1), sizeof(int), cudaMemcpyDeviceToHost) != cudaSuccess ||
+    if (cudaMemcpy(&(response->score), (d_finalScore), sizeof(int), cudaMemcpyDeviceToHost) != cudaSuccess ||
         cudaMemcpy(M, d_M, numRows*numCols, cudaMemcpyDeviceToHost) != cudaSuccess)
     {
         std::cout << "Could not copy back to host memory" << std::endl;
@@ -160,14 +152,13 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
 
     traceBack(M, numRows, numCols, request, response);
 
-    cudaFree(d_thisScores);
-    cudaFree(d_prevScores);
+    cudaFree(d_finalScore);
     cudaFree(d_scoreMatrix);
     cudaFree(d_M);
     cudaFree(d_textBytes);
     cudaFree(d_patternBytes);
     delete [] M;
 
-    std::cout << "# Score: \t" << response->score << "\n";
+    // std::cout << "# Score: \t" << response->score << "\n";
 
 }
