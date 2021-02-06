@@ -4,7 +4,6 @@
 #include <iterator>
 
 
-
 void SequenceAlignment::traceBack(const char *M, const unsigned int numRows, const unsigned int numCols,
                                   const Request &request, Response *response)
 {
@@ -48,31 +47,22 @@ void SequenceAlignment::traceBack(const char *M, const unsigned int numRows, con
 }
 
 
-void SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request &request,
-                                               SequenceAlignment::Response *response)
+int SequenceAlignment::fillMatrixNW(char *M, const unsigned int numRows, const unsigned int numCols,
+                                    const Request &request)
 {
 
-    char *M;
     int *thisRowScores;
     int *prevRowScores;
-    /// Aditional row and column for the gap character.
-    const uint64_t numCols = request.textNumBytes + 1;
-    const uint64_t numRows = request.patternNumBytes + 1;
-
     /** Allocate memory */
     try
     {
-        M = new char[numRows * numCols];
         thisRowScores = new int[numCols];
         prevRowScores = new int[numCols];
-        response->alignedTextBytes = new char[2 * request.textNumBytes];
-        response->alignedPatternBytes = new char[2 * request.textNumBytes];
-
     }
     catch(const std::bad_alloc& e)
     {
         std::cerr << SequenceAlignment::MEM_ERROR;
-        return;
+        return 0;
     }
     /** End Allocate memory */
 
@@ -124,12 +114,42 @@ void SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request 
         thisRowM += numCols;
     }
 
-    response->score = thisRowScores[numCols - 1];
+    auto score = thisRowScores[numCols -1];
+    delete [] thisRowScores;
+    delete [] prevRowScores;
+
+    return score;
+}
+
+
+void SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request &request,
+                                               SequenceAlignment::Response *response)
+{
+
+    char *M;
+    /// Aditional row and column for the gap character.
+    const unsigned int numCols = request.textNumBytes + 1;
+    const unsigned int numRows = request.patternNumBytes + 1;
+
+    /** Allocate memory */
+    try
+    {
+        M = new char[numRows * numCols];
+        response->alignedTextBytes = new char[2 * request.textNumBytes];
+        response->alignedPatternBytes = new char[2 * request.textNumBytes];
+
+    }
+    catch(const std::bad_alloc& e)
+    {
+        std::cerr << SequenceAlignment::MEM_ERROR;
+        return;
+    }
+    /** End Allocate memory */
+
+    response->score = fillMatrixNW(M, numRows, numCols, request);
+
     traceBack(M, numRows, numCols, request, response);
 
     /** De-allocate memory */
     delete [] M;
-    delete [] thisRowScores;
-    delete [] prevRowScores;
-
 }

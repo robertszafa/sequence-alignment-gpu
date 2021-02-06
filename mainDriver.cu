@@ -15,11 +15,14 @@ int main(int argc, const char *argv[])
     // Runtime dispatch based on device and alignment algorithm.
     if (request.deviceType == SequenceAlignment::programArgs::CPU &&
         request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
+    {
         SequenceAlignment::alignSequenceGlobalCPU(request, &response);
-
-    if (request.deviceType == SequenceAlignment::programArgs::GPU &&
-        request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
+    }
+    else if (request.deviceType == SequenceAlignment::programArgs::GPU &&
+             request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
+    {
         SequenceAlignment::alignSequenceGlobalGPU(request, &response);
+    }
 
     prettyAlignmentPrint(response, std::cout);
 

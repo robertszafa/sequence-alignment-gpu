@@ -6,11 +6,11 @@
 enum DIR { LEFT, DIAG, TOP};
 
 
-__global__ void alignSequenceGlobalCUDA(const char *textBytes, const uint64_t textNumBytes,
-                                        const char *patternBytes, const uint64_t patternNumBytes,
-                                        const short *scoreMatrix, const int alphabetSize,
-                                        const short gapPenalty, const int numRows, const int numCols,
-                                        char *M, int *finalScore)
+__global__ void cuda_fillMatrixNW(const char *textBytes, const uint64_t textNumBytes,
+                                  const char *patternBytes, const uint64_t patternNumBytes,
+                                  const short *scoreMatrix, const int alphabetSize,
+                                  const short gapPenalty, const int numRows, const int numCols,
+                                  char *M, int *finalScore)
 {
     extern __shared__ int _shared[];
     int *_thisScores = _shared;
@@ -74,6 +74,103 @@ __global__ void alignSequenceGlobalCUDA(const char *textBytes, const uint64_t te
         finalScore[0] = _thisScores[tid];
 }
 
+__global__ void cuda_fillMatrixDiagonalNW(const char *textBytes, const uint64_t textNumBytes,
+                                          const char *patternBytes, const uint64_t patternNumBytes,
+                                          const short *scoreMatrix, const int alphabetSize,
+                                          const short gapPenalty, const int numRows, const int numCols,
+                                          char *M, int *finalScore)
+{
+    extern __shared__ int _shared[];
+    int *_thisScores = _shared;
+    int *_prevScores = _shared + numRows;
+    int *_prevPrevScores = _shared + numRows*2;
+
+    const int tid = threadIdx.x;
+
+    const char patternByte = (tid > 0 && tid < numRows)
+                             ? patternBytes[max(numRows - 1, tid - 1)]
+                             : alphabetSize;
+
+    // First Half of matrix filling
+    int diag_size = 0;
+    for (int i_text = 0; i_text < numCols; ++i_text)
+    {
+        // Advance one diag.
+        auto tmp = _prevScores;
+        _prevScores = _thisScores;
+        _thisScores = _prevPrevScores;
+        _prevPrevScores = tmp;
+
+        if (tid == 0)
+        {
+            _thisScores[tid] = -(i_text * gapPenalty);
+            M[i_text] = DIR::LEFT;
+        }
+        else if (tid == (diag_size-1))
+        {
+            _thisScores[tid] = -(tid * gapPenalty);
+            M[tid * numCols] = DIR::TOP;
+        }
+        else if (tid < diag_size)
+        {
+            const char textByte = textBytes[i_text - 1];
+            const int scoreMatrixIdx = ((int) textByte) * alphabetSize + ((int) patternByte);
+
+            const int fromLeftScore = _prevScores[tid] - gapPenalty;
+            const int fromTopScore = _prevScores[tid - 1] - gapPenalty;
+            const int fromDiagScore = _prevPrevScores[tid - 1] + scoreMatrix[scoreMatrixIdx];
+
+            const int maxWithGap = max(fromLeftScore, fromTopScore);
+            const int maxScore = max(maxWithGap, fromDiagScore);
+            _thisScores[tid] = maxScore;
+
+            const auto dirWithGap = (fromTopScore > fromLeftScore) ? DIR::TOP : DIR::LEFT;
+            M[tid*numCols + i_text] = (fromDiagScore > maxWithGap) ? DIR::DIAG : dirWithGap;
+        }
+
+        diag_size = min(diag_size+1, numRows);
+
+        __syncthreads();
+    }
+
+    // Second half of matrix filling
+    const char textByte = (tid > 0 && tid < numCols)
+                           ? textBytes[min(numCols - tid, 0)]
+                           : alphabetSize;
+    for (int i_pattern = 1; i_pattern < numRows; ++i_pattern)
+    {
+        // Advance one diag.
+        auto tmp = _prevScores;
+        _prevScores = _thisScores;
+        _thisScores = _prevPrevScores;
+        _prevPrevScores = tmp;
+
+        if (tid > 1 && tid < diag_size)
+        {
+            const char patternByte = patternBytes[tid + i_pattern - 1];
+            const int scoreMatrixIdx = ((int) textByte) * alphabetSize + ((int) patternByte);
+
+            const int fromLeftScore = _prevScores[tid] - gapPenalty;
+            const int fromTopScore = _prevScores[tid - 1] - gapPenalty;
+            const int fromDiagScore = _prevPrevScores[tid - 1] + scoreMatrix[scoreMatrixIdx];
+
+            const int maxWithGap = max(fromLeftScore, fromTopScore);
+            const int maxScore = max(maxWithGap, fromDiagScore);
+            _thisScores[tid - 1] = maxScore;
+
+            const auto dirWithGap = (fromTopScore > fromLeftScore) ? DIR::TOP : DIR::LEFT;
+            M[(tid+i_pattern)*numCols - tid] = (fromDiagScore > maxWithGap) ? DIR::DIAG : dirWithGap;
+        }
+
+        --diag_size;
+
+        __syncthreads();
+    }
+
+    if (tid == 0)
+        finalScore[0] = _thisScores[tid];
+}
+
 
 void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &request,
                                                SequenceAlignment::Response *response)
@@ -101,7 +198,17 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     short *d_scoreMatrix;
     char *d_textBytes, *d_patternBytes, *d_M;
 
-    /** Allocate and transfer memory */
+    auto freeMemory = [&]()
+    {
+        cudaFree(d_finalScore);
+        cudaFree(d_scoreMatrix);
+        cudaFree(d_M);
+        cudaFree(d_textBytes);
+        cudaFree(d_patternBytes);
+        delete [] M;
+    };
+
+    /** Allocate and transfer memory to device */
     if (cudaMalloc(&d_finalScore, sizeof(int)) != cudaSuccess ||
         cudaMalloc(&d_scoreMatrix, sizeof(short) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
         cudaMalloc(&d_M, numRows * numCols) != cudaSuccess ||
@@ -109,39 +216,29 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
         cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess)
     {
         std::cout << MEM_ERROR << std::endl;
-        cudaFree(d_finalScore);
-        cudaFree(d_scoreMatrix);
-        cudaFree(d_M);
-        cudaFree(d_textBytes);
-        cudaFree(d_patternBytes);
+        freeMemory();
         return;
     }
-
     if (cudaMemcpy(d_textBytes, request.textBytes, request.textNumBytes, cudaMemcpyHostToDevice) != cudaSuccess ||
         cudaMemcpy(d_patternBytes, request.patternBytes, request.patternNumBytes, cudaMemcpyHostToDevice) != cudaSuccess ||
         cudaMemcpy(d_scoreMatrix, request.scoreMatrix, sizeof(short) * (request.alphabetSize * request.alphabetSize), cudaMemcpyHostToDevice) != cudaSuccess)
     {
         std::cout << MEM_ERROR << std::endl;
-        cudaFree(d_finalScore);
-        cudaFree(d_scoreMatrix);
-        cudaFree(d_M);
-        cudaFree(d_textBytes);
-        cudaFree(d_patternBytes);
+        freeMemory();
         return;
     }
     /** End Allocate and transfer memory */
 
-    // this and prev row scores
     const unsigned int sharedMemSize = 2 * numCols * sizeof(int);
     // std::cout << "Num col: " << numCols << "\n";
     // std::cout << "Num bytes in shared: " << sharedMemSize << "\n";
     // std::cout << "Num cols: " << numCols << "\n";
 
-    alignSequenceGlobalCUDA<<<1, numCols, sharedMemSize>>>(d_textBytes, request.textNumBytes,
-                                                           d_patternBytes, request.patternNumBytes,
-                                                           d_scoreMatrix, request.alphabetSize,
-                                                           request.gapPenalty, numRows, numCols,
-                                                           d_M, d_finalScore);
+    cuda_fillMatrixNW<<<1, numCols, sharedMemSize>>>(d_textBytes, request.textNumBytes,
+                                                     d_patternBytes, request.patternNumBytes,
+                                                     d_scoreMatrix, request.alphabetSize,
+                                                     request.gapPenalty, numRows, numCols,
+                                                     d_M, d_finalScore);
 
     if (cudaMemcpy(&(response->score), (d_finalScore), sizeof(int), cudaMemcpyDeviceToHost) != cudaSuccess ||
         cudaMemcpy(M, d_M, numRows*numCols, cudaMemcpyDeviceToHost) != cudaSuccess)
@@ -152,12 +249,7 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
 
     traceBack(M, numRows, numCols, request, response);
 
-    cudaFree(d_finalScore);
-    cudaFree(d_scoreMatrix);
-    cudaFree(d_M);
-    cudaFree(d_textBytes);
-    cudaFree(d_patternBytes);
-    delete [] M;
+    freeMemory();
 
     // std::cout << "# Score: \t" << response->score << "\n";
 

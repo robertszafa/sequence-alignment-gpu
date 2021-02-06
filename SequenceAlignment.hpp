@@ -2,6 +2,8 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
+#include <iostream>
 
 namespace SequenceAlignment
 {
@@ -128,6 +130,8 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     void alignSequenceGlobalGPU(const Request&, Response*);
 
     void traceBack(const char*, const unsigned int, const unsigned int, const Request&, Response*);
+
+    int fillMatrixNW(char*, const unsigned int, const unsigned int, const Request&);
 
 } // namespace SequenceAlignment
 
