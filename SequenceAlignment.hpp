@@ -81,25 +81,43 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         /// What is the type of the aignment algorithm.
         programArgs alignmentType;
         /// Buffer holding the text sequence.
-        char *textBytes; int textNumBytes;
+        char *textBytes = nullptr;
+        int textNumBytes;
         /// Buffer holding the pattern sequence.
-        char *patternBytes; int patternNumBytes;
+        char *patternBytes = nullptr;
+        int patternNumBytes;
         /// Alphabet of the sequence.
         const char *alphabet; int alphabetSize;
         /// Substitution matrix stored in row major order.
         short scoreMatrix[NUM_PROTEIN_CHARS * NUM_PROTEIN_CHARS];
         /// Penalty for a gap.
         short gapPenalty;
+
+        ~Request()
+        {
+            if (textBytes) delete[] textBytes;
+            if (patternBytes) delete[] patternBytes;
+            textBytes = nullptr;
+            patternBytes = nullptr;
+        }
     };
 
     struct Response
     {
         /// Buffer holding the aligned text sequence.
-        char *alignedTextBytes;
+        char *alignedTextBytes = nullptr;
         /// Buffer holding the aligned pattern sequence.
-        char *alignedPatternBytes;
+        char *alignedPatternBytes = nullptr;
         int numAlignmentBytes;
         int score;
+
+        ~Response()
+        {
+            if (alignedTextBytes) delete[] alignedTextBytes;
+            if (alignedPatternBytes) delete[] alignedPatternBytes;
+            alignedTextBytes = nullptr;
+            alignedPatternBytes = nullptr;
+        }
     };
 
     enum DIR { LEFT, DIAG, TOP};
