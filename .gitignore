@@ -13,3 +13,4 @@ alignSequence
 *.json
 **/.DS_STORE
 runTests
+runBenchmarks

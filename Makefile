@@ -1,21 +1,20 @@
 NVCC=nvcc
-CXX=clang++
-CXXFLAGS=-std=c++14 -m64 -arch=sm_30 -O3
+CUDA_FLAGS=-std=c++14 -m64 -arch=sm_30 -O3
 
 BIN=alignSequence
-TEST=runTests
-BENCHMARK=benchmark
+TEST_BIN=runTests
+BENCHMARK_BIN=runBenchmarks
 
-all : $(BIN) $(TEST) $(BENCHMARK)
+all : $(BIN) $(TEST_BIN) $(BENCHMARK_BIN)
 
 $(BIN) : mainDriver.cu utilities.cpp alignSequenceCPU.cpp alignSequenceGPU.cu SequenceAlignment.hpp
-		$(NVCC) $(CXXFLAGS) $(FLAGS) mainDriver.cu -o $(BIN)
+		$(NVCC) $(CUDA_FLAGS) $(FLAGS) mainDriver.cu -o $(BIN)
 
-$(TEST) : test/tests.cu utilities.cpp alignSequenceCPU.cpp alignSequenceGPU.cu SequenceAlignment.hpp
-		$(NVCC) $(CXXFLAGS) test/tests.cu -o $(TEST)
+$(TEST_BIN) : test/tests.cu utilities.cpp alignSequenceCPU.cpp alignSequenceGPU.cu SequenceAlignment.hpp
+		$(NVCC) $(CUDA_FLAGS) test/tests.cu -o $(TEST_BIN)
 
-$(BENCHMARK) : alignSequenceCPU.cpp alignSequenceGPU.cu SequenceAlignment.hpp benchmark.cu
-		$(NVCC) $(CXXFLAGS) benchmark.cu -o $(BENCHMARK)
+$(BENCHMARK_BIN) : alignSequenceCPU.cpp alignSequenceGPU.cu SequenceAlignment.hpp test/benchmarks.cu
+		$(NVCC) $(CUDA_FLAGS) test/benchmarks.cu -o $(BENCHMARK_BIN)
 
 clean :
-		rm *.o $(BIN) $(TEST_BIN) $(BENCHMARK)
+		rm -f *.o $(BIN) $(TEST_BIN) $(BENCHMARK_BIN)

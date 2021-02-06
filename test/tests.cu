@@ -336,10 +336,10 @@ TEST_CASE("alignSequenceGlobalGPU")
     //     SequenceAlignment::alignSequenceGlobalCPU(request, &responseCPU);
 
     //     REQUIRE(responseCPU.score == responseGPU.score);
-        // REQUIRE(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
-        //         std::string(responseGPU.alignedTextBytes, (responseGPU.alignedTextBytes + responseGPU.numAlignmentBytes)));
-        // REQUIRE(std::string(responseCPU.alignedPatternBytes, (responseCPU.alignedPatternBytes + responseCPU.numAlignmentBytes)) ==
-        //         std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
+    //     REQUIRE(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
+    //             std::string(responseGPU.alignedTextBytes, (responseGPU.alignedTextBytes + responseGPU.numAlignmentBytes)));
+    //     REQUIRE(std::string(responseCPU.alignedPatternBytes, (responseCPU.alignedPatternBytes + responseCPU.numAlignmentBytes)) ==
+    //             std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
     // }
 
 }

@@ -61,8 +61,6 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     const char PROTEIN_ALPHABET[] =  {'A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K',
                                       'M', 'F', 'P', 'S', 'T', 'W', 'Y', 'V', 'B', 'Z', 'X', '-'};
 
-    const unsigned int MAX_SEQUENCE_LEN = 8192;
-
     /// Default program arguments.
     const programArgs DEFAULT_DEVICE = programArgs::CPU;
     const programArgs DEFAULT_SEQUENCE = programArgs::DNA;
