@@ -16,10 +16,10 @@
 ///
 /// This version is slower than the version which exploits parallism across the diagonal
 /// of the matrix, however, it is included here in the benchmarks to show that it was explored.
-__global__ void cuda_fillMatrixNW_v0(const char *textBytes, const char *patternBytes,
-                                     const short *scoreMatrix, const int alphabetSize,
-                                     const short gapPenalty, const int numRows, const int numCols,
-                                     char *M, int *finalScore)
+__global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *patternBytes,
+                                             const short *scoreMatrix, const int alphabetSize,
+                                             const short gapPenalty, const int numRows, const int numCols,
+                                             char *M, int *finalScore)
 {
     using SequenceAlignment::DIR;
 
@@ -85,13 +85,12 @@ __global__ void cuda_fillMatrixNW_v0(const char *textBytes, const char *patternB
         finalScore[0] = _thisScores[tid];
 }
 
-
 unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const unsigned int numCols,
-                                     const SequenceAlignment::Request &request, bool old = false)
+                                     const SequenceAlignment::Request &request, bool diagonal = true)
 {
     int *d_finalScore;
     short *d_scoreMatrix;
-    char *d_textBytes, *d_patternBytes, *d_M;
+    char *d_textBytes, *d_patternBytes, *d_M, *d_columnState;
 
     auto freeMemory = [&]()
     {
@@ -100,14 +99,16 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
         cudaFree(d_M);
         cudaFree(d_textBytes);
         cudaFree(d_patternBytes);
+        cudaFree(d_columnState);
     };
 
-    /** Allocate and transfer memory */
+    /** Allocate and transfer memory to device */
     if (cudaMalloc(&d_finalScore, sizeof(int)) != cudaSuccess ||
         cudaMalloc(&d_scoreMatrix, sizeof(short) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
         cudaMalloc(&d_M, numRows * numCols) != cudaSuccess ||
         cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
-        cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess)
+        cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
+        cudaMalloc(&d_columnState, numCols) != cudaSuccess)
     {
         freeMemory();
         return 0;
@@ -123,22 +124,23 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
 
     auto begin = std::chrono::steady_clock::now();
 
-    if (old)
+    if (diagonal)
     {
-        const unsigned int sharedMemSize = 2 * numCols * sizeof(int);
-        cuda_fillMatrixNW_v0<<<1, numCols, sharedMemSize>>>(d_textBytes, d_patternBytes,
-                                                            d_scoreMatrix, request.alphabetSize,
-                                                            request.gapPenalty, numRows, numCols,
-                                                            d_M, d_finalScore);
-
+        const unsigned int sharedMemSize = 3 * numRows * sizeof(int);
+        const auto workerId = 0, startRow = 0;
+        cuda_fillMatrixNW<<<1, numRows, sharedMemSize>>>(d_textBytes, d_patternBytes,
+                                                         d_scoreMatrix, request.alphabetSize,
+                                                         request.gapPenalty, startRow, numRows,
+                                                         numCols, workerId, d_columnState,
+                                                         d_M, d_finalScore);
     }
     else
     {
-        const unsigned int sharedMemSize = 3 * numRows * sizeof(int);
-        cuda_fillMatrixNW<<<1, numRows, sharedMemSize>>>(d_textBytes, d_patternBytes,
-                                                         d_scoreMatrix, request.alphabetSize,
-                                                         request.gapPenalty, numRows, numCols,
-                                                         d_M, d_finalScore);
+        const unsigned int sharedMemSize = 2 * numCols * sizeof(int);
+        cuda_fillMatrixNW_horizontal<<<1, numCols, sharedMemSize>>>(d_textBytes, d_patternBytes,
+                                                            d_scoreMatrix, request.alphabetSize,
+                                                            request.gapPenalty, numRows, numCols,
+                                                            d_M, d_finalScore);
     }
 
     if (cudaMemcpy(M, d_M, numRows*numCols, cudaMemcpyDeviceToHost) != cudaSuccess)
@@ -158,7 +160,7 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
 
 
 
-void benchmarkFillMatrixNW()
+void benchmarkCudaFillMatrixNW_diagonal_vs_horizontal()
 {
     std::vector<std::pair<int, int>> benchmarkSizes =
     {
@@ -168,6 +170,47 @@ void benchmarkFillMatrixNW()
         std::make_pair(1024, 1024*8),
         std::make_pair(1024, 1024*16),
         std::make_pair(1024, 1024*32),
+    };
+
+    for (const auto &sizePair : benchmarkSizes)
+    {
+        auto numRows = sizePair.first;
+        auto numCols = sizePair.second;
+        std::cout << "-----  " << numRows << " x " << numCols << "  -----\n";
+
+        SequenceAlignment::Request request;
+        request.sequenceType = SequenceAlignment::programArgs::PROTEIN;
+        request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
+        request.alphabet = SequenceAlignment::PROTEIN_ALPHABET;
+        request.alphabetSize = SequenceAlignment::NUM_PROTEIN_CHARS;
+        request.gapPenalty = 5;
+        request.textNumBytes = numCols - 1;
+        request.patternNumBytes = numRows - 1;
+        request.textBytes = new char[request.textNumBytes];
+        request.patternBytes = new char[request.patternNumBytes];
+        std::fill_n(request.textBytes, request.textNumBytes, 'A');
+        std::fill_n(request.patternBytes, request.patternNumBytes, 'A');
+        char *M = &(std::vector<char>(numRows * numCols))[0]; // Automatically clean-up M.
+
+        int totalTimeGPU_diagonal = 0;
+        for (int i=0; i<NUM_REPEATS; ++i)
+            totalTimeGPU_diagonal += wrapperCuda_fillMatrixNW(M, numRows, numCols, request);
+
+        int totalTimeGPU_horizontal = 0;
+        for (int i=0; i<NUM_REPEATS; ++i)
+            totalTimeGPU_horizontal += wrapperCuda_fillMatrixNW(M, numCols, numRows, request, false);
+
+        std::cout << "GPU (diagonal) = " << (totalTimeGPU_diagonal/NUM_REPEATS) << " ms\n";
+        std::cout << "GPU (horizontal) = " << (totalTimeGPU_horizontal/NUM_REPEATS) << " ms\n";
+    }
+
+}
+
+void benchmarkFillMatrixNW_GPU_vs_CPU()
+{
+    std::vector<std::pair<int, int>> benchmarkSizes =
+    {
+        std::make_pair(1024*2, 1024*2),
     };
 
     for (const auto &sizePair : benchmarkSizes)
@@ -204,13 +247,8 @@ void benchmarkFillMatrixNW()
         for (int i=0; i<NUM_REPEATS; ++i)
             totalTimeGPU += wrapperCuda_fillMatrixNW(M, numRows, numCols, request);
 
-        int totalTimeGPU_v0 = 0;
-        for (int i=0; i<NUM_REPEATS; ++i)
-            totalTimeGPU_v0 += wrapperCuda_fillMatrixNW(M, numCols, numRows, request, true);
-
         std::cout << "CPU = " << (totalTimeCPU/NUM_REPEATS) << " ms\n";
         std::cout << "GPU = " << (totalTimeGPU/NUM_REPEATS) << " ms\n";
-        std::cout << "GPU (version 0) = " << (totalTimeGPU_v0/NUM_REPEATS) << " ms\n";
     }
 
 }
@@ -219,7 +257,9 @@ void benchmarkFillMatrixNW()
 
 int main(int argc, const char *argv[])
 {
-    benchmarkFillMatrixNW();
+    // benchmarkCudaFillMatrixNW_diagonal_vs_horizontal();
+
+    benchmarkFillMatrixNW_GPU_vs_CPU();
 
 
     return 0;
