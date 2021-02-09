@@ -20,8 +20,8 @@ __device__ void busy_wait(const char* columnState, const int worker_id, const in
 
 
 __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternBytes,
-                                  const short *scoreMatrix, const int alphabetSize,
-                                  const short gapPenalty, const int startRow, const int endRow,
+                                  const int *scoreMatrix, const int alphabetSize,
+                                  const int gapPenalty, const int startRow, const int endRow,
                                   const int numCols, const int workerId, char *columnState,
                                   char *M, int *finalScore)
 {
@@ -148,8 +148,7 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     }
     /** End Allocate host memory */
 
-    int *d_finalScore;
-    short *d_scoreMatrix;
+    int *d_finalScore, *d_scoreMatrix;
     char *d_textBytes, *d_patternBytes, *d_M, *d_columnState;
 
     auto freeMemory = [&]()
@@ -165,7 +164,7 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
 
     /** Allocate and transfer memory to device */
     if (cudaMalloc(&d_finalScore, sizeof(int)) != cudaSuccess ||
-        cudaMalloc(&d_scoreMatrix, sizeof(short) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
+        cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
         cudaMalloc(&d_M, numRows * numCols) != cudaSuccess ||
         cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
         cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
@@ -177,7 +176,7 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     }
     if (cudaMemcpy(d_textBytes, request.textBytes, request.textNumBytes, cudaMemcpyHostToDevice) != cudaSuccess ||
         cudaMemcpy(d_patternBytes, request.patternBytes, request.patternNumBytes, cudaMemcpyHostToDevice) != cudaSuccess ||
-        cudaMemcpy(d_scoreMatrix, request.scoreMatrix, sizeof(short) * (request.alphabetSize * request.alphabetSize), cudaMemcpyHostToDevice) != cudaSuccess)
+        cudaMemcpy(d_scoreMatrix, request.scoreMatrix, sizeof(int) * (request.alphabetSize * request.alphabetSize), cudaMemcpyHostToDevice) != cudaSuccess)
     {
         std::cout << MEM_ERROR << std::endl;
         freeMemory();

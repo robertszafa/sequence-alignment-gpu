@@ -17,8 +17,8 @@
 /// This version is slower than the version which exploits parallism across the diagonal
 /// of the matrix, however, it is included here in the benchmarks to show that it was explored.
 __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *patternBytes,
-                                             const short *scoreMatrix, const int alphabetSize,
-                                             const short gapPenalty, const int numRows, const int numCols,
+                                             const int *scoreMatrix, const int alphabetSize,
+                                             const int gapPenalty, const int numRows, const int numCols,
                                              char *M, int *finalScore)
 {
     using SequenceAlignment::DIR;
@@ -88,8 +88,7 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
 unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const unsigned int numCols,
                                      const SequenceAlignment::Request &request, bool diagonal = true)
 {
-    int *d_finalScore;
-    short *d_scoreMatrix;
+    int *d_finalScore, *d_scoreMatrix;
     char *d_textBytes, *d_patternBytes, *d_M, *d_columnState;
 
     auto freeMemory = [&]()
@@ -104,7 +103,7 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
 
     /** Allocate and transfer memory to device */
     if (cudaMalloc(&d_finalScore, sizeof(int)) != cudaSuccess ||
-        cudaMalloc(&d_scoreMatrix, sizeof(short) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
+        cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
         cudaMalloc(&d_M, numRows * numCols) != cudaSuccess ||
         cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
         cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
@@ -115,7 +114,7 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
     }
     if (cudaMemcpy(d_textBytes, request.textBytes, request.textNumBytes, cudaMemcpyHostToDevice) != cudaSuccess ||
         cudaMemcpy(d_patternBytes, request.patternBytes, request.patternNumBytes, cudaMemcpyHostToDevice) != cudaSuccess ||
-        cudaMemcpy(d_scoreMatrix, request.scoreMatrix, sizeof(short) * (request.alphabetSize * request.alphabetSize), cudaMemcpyHostToDevice) != cudaSuccess)
+        cudaMemcpy(d_scoreMatrix, request.scoreMatrix, sizeof(int) * (request.alphabetSize * request.alphabetSize), cudaMemcpyHostToDevice) != cudaSuccess)
     {
         freeMemory();
         return 0;

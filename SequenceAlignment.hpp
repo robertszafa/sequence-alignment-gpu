@@ -43,15 +43,15 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
        --semi-global         - use semi global alignment\n\
        --local               - use local alignment\n\
        -s, --score-matrix    - next argument is a score matrix file\n\
-       --gap-penalty         - [int] next argument is a gap open penalty (default 5)\n";
+       --gap-penalty         - next argument is a gap open penalty (default 5)\n";
     const std::string SEQ_NOT_READ_ERROR = "error: text sequence or pattern sequence not read\n";
     const std::string MEM_ERROR = "error: sequence is too long, not enough memory\n";
     const std::string TEXT_SHORTER_THAN_PATTERN_ERROR =
         "error: text sequence cannot be shorter than the pattern sequence.\n";
     const std::string SCORE_MATRIX_NOT_READ_ERROR =
-        "error: matrix scores not read. Only integer scores accepted (-32,768 to 32,767)\n";
+        "error: matrix scores not read. Only integer scores accepted (int)\n";
     const std::string GAP_PENALTY_NOT_READ_ERROR =
-        "error: gap penalty not read. Only integer scores accepted (-32,768 to 32,767)\n";
+        "error: gap penalty not read. Only integer scores accepted (int)\n";
 
     const unsigned int NUM_DNA_CHARS = 4;
     const unsigned int NUM_PROTEIN_CHARS = 23;
@@ -89,9 +89,9 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         /// Alphabet of the sequence.
         const char *alphabet; int alphabetSize;
         /// Substitution matrix stored in row major order.
-        short scoreMatrix[NUM_PROTEIN_CHARS * NUM_PROTEIN_CHARS];
+        int scoreMatrix[NUM_PROTEIN_CHARS * NUM_PROTEIN_CHARS];
         /// Penalty for a gap.
-        short gapPenalty;
+        int gapPenalty;
 
         ~Request()
         {

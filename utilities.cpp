@@ -17,7 +17,7 @@ char indexOfLetter(const char letter, const char *alphabet, const int alphabetSi
 /// Given two characters, an alphabet and a scoring matrix,
 /// return the score of the character combination.
 int getScore(char char1, char char2, const char *alphabet, const int alphabetSize,
-             const short *scoreMatrix)
+             const int *scoreMatrix)
 {
     int idx = indexOfLetter(char1, alphabet, alphabetSize) * alphabetSize +
               indexOfLetter(char2, alphabet, alphabetSize);
@@ -90,12 +90,12 @@ int readSequenceFile(const std::string fname, SequenceAlignment::Request *reques
     return 0;
 }
 
-int parseScoreMatrixFile(const std::string& fname, const int alphabetSize, short *buffer)
+int parseScoreMatrixFile(const std::string& fname, const int alphabetSize, int *buffer)
 {
     std::ifstream f(fname);
     if (f.good())
     {
-        short nextScore;
+        int nextScore;
         for (int i = 0; i < alphabetSize; ++i)
         {
             for (int j = 0; j < alphabetSize; ++j)
