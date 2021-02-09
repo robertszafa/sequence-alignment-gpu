@@ -125,7 +125,8 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
 
     if (diagonal)
     {
-        const unsigned int sharedMemSize = 3 * numRows * sizeof(int);
+        const unsigned int sharedMemSize = 3 * numRows * sizeof(int) +
+                                           request.alphabetSize * request.alphabetSize * sizeof(int);
         const auto workerId = 0, startRow = 0;
         cuda_fillMatrixNW<<<1, numRows, sharedMemSize>>>(d_textBytes, d_patternBytes,
                                                          d_scoreMatrix, request.alphabetSize,
@@ -167,8 +168,8 @@ void benchmarkCudaFillMatrixNW_diagonal_vs_horizontal()
         std::make_pair(1024, 1024*2),
         std::make_pair(1024, 1024*4),
         std::make_pair(1024, 1024*8),
-        std::make_pair(1024, 1024*16),
-        std::make_pair(1024, 1024*32),
+        // std::make_pair(1024, 1024*16),
+        // std::make_pair(1024, 1024*32),
     };
 
     for (const auto &sizePair : benchmarkSizes)
@@ -256,9 +257,9 @@ void benchmarkFillMatrixNW_GPU_vs_CPU()
 
 int main(int argc, const char *argv[])
 {
-    // benchmarkCudaFillMatrixNW_diagonal_vs_horizontal();
+    benchmarkCudaFillMatrixNW_diagonal_vs_horizontal();
 
-    benchmarkFillMatrixNW_GPU_vs_CPU();
+    // benchmarkFillMatrixNW_GPU_vs_CPU();
 
 
     return 0;

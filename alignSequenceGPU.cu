@@ -30,13 +30,23 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
     const int numRows = endRow - startRow;
 
     extern __shared__ int _shared[];
-    int *_thisScores = _shared;
-    int *_prevScores = _shared + numRows;
-    int *_prevPrevScores = _shared + numRows*2;
+    int *_scoreMatrix = _shared;
+    int *_thisScores = _shared + alphabetSize*alphabetSize;
+    int *_prevScores = _thisScores + numRows;
+    int *_prevPrevScores = _prevScores + numRows;
 
     const int tid = threadIdx.x;
 
+    // Transfer score matrix to shared memory.
+    for (int offset=0; offset < alphabetSize*alphabetSize; offset += blockDim.x)
+    {
+        if ((offset + tid) < alphabetSize*alphabetSize)
+            _scoreMatrix[offset + tid] = scoreMatrix[offset + tid];
+    }
+
     const char patternByte = patternBytes[max(0, tid - 1 + startRow)];
+
+    __syncthreads();
 
     // First half of matrix filling
     int diag_size = 0;
@@ -73,7 +83,7 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
 
             const int fromLeftScore = _prevScores[tid] - gapPenalty;
             const int fromTopScore = _prevScores[tid - 1] - gapPenalty;
-            const int fromDiagScore = _prevPrevScores[tid - 1] + scoreMatrix[scoreMatrixIdx];
+            const int fromDiagScore = _prevPrevScores[tid - 1] + _scoreMatrix[scoreMatrixIdx];
 
             const int maxWithGap = max(fromLeftScore, fromTopScore);
             _thisScores[tid] = max(maxWithGap, fromDiagScore);
@@ -106,7 +116,7 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
 
             const int fromLeftScore = _prevScores[tid] - gapPenalty;
             const int fromTopScore = _prevScores[tid - 1] - gapPenalty;
-            const int fromDiagScore = _prevPrevScores[tid - 1] + scoreMatrix[scoreMatrixIdx];
+            const int fromDiagScore = _prevPrevScores[tid - 1] + _scoreMatrix[scoreMatrixIdx];
 
             const int maxWithGap = max(fromLeftScore, fromTopScore);
             _thisScores[tid] = max(maxWithGap, fromDiagScore);
@@ -139,7 +149,6 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
         M = new char[numRows * numCols];
         response->alignedTextBytes = new char[2 * request.textNumBytes];
         response->alignedPatternBytes = new char[2 * request.textNumBytes];
-
     }
     catch(const std::bad_alloc& e)
     {
@@ -184,7 +193,8 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     }
     /** End Allocate and transfer memory */
 
-    const unsigned int sharedMemSize = 3 * numRows * sizeof(int);
+    const unsigned int sharedMemSize = 3 * numRows * sizeof(int) +
+                                       request.alphabetSize * request.alphabetSize * sizeof(int);
 
     int startRow = 0;
     for (int i=0; i < (numRows/MAX_THREADS_PER_BLOCK + 1); ++i)
