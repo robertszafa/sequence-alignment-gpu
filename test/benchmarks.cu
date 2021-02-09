@@ -88,13 +88,14 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
 unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const unsigned int numCols,
                                      const SequenceAlignment::Request &request, bool diagonal = true)
 {
-    int *d_finalScore, *d_scoreMatrix;
+    int *d_finalScore, *d_scoreMatrix, *d_lastRowScores;
     char *d_textBytes, *d_patternBytes, *d_M, *d_columnState;
 
     auto freeMemory = [&]()
     {
         cudaFree(d_finalScore);
         cudaFree(d_scoreMatrix);
+        cudaFree(d_lastRowScores);
         cudaFree(d_M);
         cudaFree(d_textBytes);
         cudaFree(d_patternBytes);
@@ -104,6 +105,7 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
     /** Allocate and transfer memory to device */
     if (cudaMalloc(&d_finalScore, sizeof(int)) != cudaSuccess ||
         cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
+        cudaMalloc(&d_lastRowScores, sizeof(int) * numCols) != cudaSuccess ||
         cudaMalloc(&d_M, numRows * numCols) != cudaSuccess ||
         cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
         cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
@@ -132,7 +134,7 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
                                                          d_scoreMatrix, request.alphabetSize,
                                                          request.gapPenalty, startRow, numRows,
                                                          numCols, workerId, d_columnState,
-                                                         d_M, d_finalScore);
+                                                         d_lastRowScores, d_M, d_finalScore);
     }
     else
     {
@@ -197,8 +199,8 @@ void benchmarkCudaFillMatrixNW_diagonal_vs_horizontal()
             totalTimeGPU_diagonal += wrapperCuda_fillMatrixNW(M, numRows, numCols, request);
 
         int totalTimeGPU_horizontal = 0;
-        for (int i=0; i<NUM_REPEATS; ++i)
-            totalTimeGPU_horizontal += wrapperCuda_fillMatrixNW(M, numCols, numRows, request, false);
+        // for (int i=0; i<NUM_REPEATS; ++i)
+        //     totalTimeGPU_horizontal += wrapperCuda_fillMatrixNW(M, numCols, numRows, request, false);
 
         std::cout << "GPU (diagonal) = " << (totalTimeGPU_diagonal/NUM_REPEATS) << " ms\n";
         std::cout << "GPU (horizontal) = " << (totalTimeGPU_horizontal/NUM_REPEATS) << " ms\n";
