@@ -6,18 +6,18 @@ constexpr unsigned int MAX_THREADS_PER_BLOCK = 1024;
 
 using SequenceAlignment::DIR;
 
-enum COLUMN_STATE { UNDEFINED, READY_FOR_0, READY_FOR_1, };
+struct columnState { int score; int kernelId; };
 
-__device__ __forceinline__ void yield(char* columnState, const int worker_id, const int col)
+__device__ __forceinline__ void set_done(columnState* volatile colState, const int col,
+                                         const int score, const int kernelId)
 {
-    columnState[col] = (worker_id == 0) ? COLUMN_STATE::READY_FOR_1 : COLUMN_STATE::READY_FOR_0;
+    colState[col] = {score, kernelId+1};
 }
 
-__device__ __forceinline__ void busy_wait(const char* columnState, const int worker_id, const int col)
+__device__ __forceinline__ void busy_wait(columnState* volatile colState, const int col,
+                                          const int kernelId)
 {
-    auto waitingFor = (worker_id == 0) ? COLUMN_STATE::READY_FOR_0 : COLUMN_STATE::READY_FOR_1;
-
-    while (columnState[col] != waitingFor) continue;
+    while (colState[col].kernelId != kernelId) continue;
 }
 
 __device__ __forceinline__ void ping_pong_buffers(int *&first, int *&second, int *&third)
@@ -49,12 +49,11 @@ __device__ __forceinline__ int choose_direction(const int leftScore,
 }
 
 __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternBytes,
-                                  const int *scoreMatrix, const int alphabetSize,
-                                  const int gapPenalty, const int startRow, const int endRow,
-                                  const int numCols, const int workerId, char *columnState,
-                                  int *lastRowScores, char *M, int *finalScore)
+                                  const int *scoreMatrix, const int alphabetSize, const int gapPenalty,
+                                  const int startRow, const int endRow, const int numCols,
+                                  const int kernelId, columnState* colState, char *M)
 {
-    const int numRows = endRow - startRow;
+    const int numRows = blockDim.x;
 
     extern __shared__ int _shared[];
     int *_scoreMatrix = _shared;
@@ -65,7 +64,7 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
     const int tid = threadIdx.x;
 
     // Transfer score matrix to shared memory.
-    for (int offset=0; offset < alphabetSize*alphabetSize; offset += blockDim.x)
+    for (int offset=0; offset < alphabetSize*alphabetSize; offset += numRows)
     {
         if ((offset + tid) < alphabetSize*alphabetSize)
             _scoreMatrix[offset + tid] = scoreMatrix[offset + tid];
@@ -85,7 +84,7 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
         const int threadInRowIdx = i_text - tid;
 
         if (startRow > 0)
-            busy_wait(columnState, workerId, i_text);
+            busy_wait(colState, i_text, kernelId);
 
         if (tid == 0 && startRow == 0)
         {
@@ -110,14 +109,10 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
                                                 gapPenalty, _scoreMatrix[scoreMatrixIdx],
                                                 (M + tid*numCols + threadInRowIdx));
         }
-
-        if (tid == (diag_size-1) && diag_size == numRows)
-        {
-            yield(columnState, workerId, threadInRowIdx);
-            lastRowScores[threadInRowIdx] = _thisScores[tid];
-        }
-
         __syncthreads();
+
+        if (tid == endRow && tid < diag_size)
+            set_done(colState, threadInRowIdx, _thisScores[tid], kernelId);
     }
 
     // Second half of matrix filling.
@@ -137,19 +132,14 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
                                                 _prevPrevScores[tid - 1],
                                                 gapPenalty, _scoreMatrix[scoreMatrixIdx],
                                                 (M + tid*numCols + threadInRowIdx));
-        }
 
-        if (tid == (diag_size-1))
-        {
-            yield(columnState, workerId, threadInRowIdx);
-            lastRowScores[threadInRowIdx] = _thisScores[tid];
+            if (tid == endRow)
+                set_done(colState, threadInRowIdx, _thisScores[tid], kernelId);
         }
 
         __syncthreads();
     }
 
-    if (tid == (numRows - 1))
-        finalScore[0] = _thisScores[tid];
 }
 
 
@@ -174,29 +164,26 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     }
     /** End Allocate host memory */
 
-    int *d_finalScore, *d_scoreMatrix, *d_lastRowScores;
-    char *d_textBytes, *d_patternBytes, *d_M, *d_columnState;
+    char *d_textBytes, *d_patternBytes, *d_M;
+    int *d_scoreMatrix;
+    columnState *d_columnState;
 
     auto freeMemory = [&]()
     {
-        cudaFree(d_finalScore);
-        cudaFree(d_scoreMatrix);
-        cudaFree(d_lastRowScores);
-        cudaFree(d_M);
         cudaFree(d_textBytes);
         cudaFree(d_patternBytes);
+        cudaFree(d_M);
+        cudaFree(d_scoreMatrix);
         cudaFree(d_columnState);
         delete [] M;
     };
 
     /** Allocate and transfer memory to device */
-    if (cudaMalloc(&d_finalScore, sizeof(int)) != cudaSuccess ||
-        cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
-        cudaMalloc(&d_lastRowScores, sizeof(int) * numCols) != cudaSuccess ||
+    if (cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
         cudaMalloc(&d_M, numRows * numCols) != cudaSuccess ||
         cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
         cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
-        cudaMalloc(&d_columnState, numCols) != cudaSuccess)
+        cudaMalloc(&d_columnState, numCols * sizeof(columnState)) != cudaSuccess)
     {
         std::cout << MEM_ERROR << std::endl;
         freeMemory();
@@ -216,29 +203,29 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
                                        request.alphabetSize * request.alphabetSize * sizeof(int);
 
     int startRow = 0;
-    for (int i=0; i < (numRows/MAX_THREADS_PER_BLOCK + 1); ++i)
+    for (int i_kernel=0; i_kernel < (numRows/MAX_THREADS_PER_BLOCK + 1); ++i_kernel)
     {
         const int numThreads = std::min(MAX_THREADS_PER_BLOCK, numRows - startRow);
-        const int endRow = startRow + numThreads;
+        const int endRow = startRow + numThreads - 1;
 
-        const int workerId = (i%2 == 0) ? 0 : 1;
         cuda_fillMatrixNW<<<1, numThreads, sharedMemSize>>>(d_textBytes, d_patternBytes,
                                                             d_scoreMatrix, request.alphabetSize,
                                                             request.gapPenalty, startRow, endRow,
-                                                            numCols, workerId, d_columnState,
-                                                            d_lastRowScores, d_M, d_finalScore);
+                                                            numCols, i_kernel, d_columnState, d_M);
 
-        startRow = std::min(startRow + MAX_THREADS_PER_BLOCK, numRows-1);
+        startRow = endRow + 1;
     }
 
     // std::cout << "Num rows: " << numRows << "\n";
     // std::cout << "Num col: " << numCols << "\n";
     // std::cout << "Num bytes in shared: " << sharedMemSize << "\n";
 
-    if (cudaMemcpy(&(response->score), d_finalScore, sizeof(int), cudaMemcpyDeviceToHost) != cudaSuccess ||
+    cudaDeviceSynchronize();
+    if (cudaMemcpy(&(response->score), &(d_columnState[numCols - 1].score), sizeof(int), cudaMemcpyDeviceToHost) != cudaSuccess ||
         cudaMemcpy(M, d_M, numRows*numCols, cudaMemcpyDeviceToHost) != cudaSuccess)
     {
         std::cout << "Could not copy back to host memory" << std::endl;
+        freeMemory();
         return;
     }
 
