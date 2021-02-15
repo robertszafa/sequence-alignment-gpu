@@ -86,17 +86,26 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
         if (startRow > 0)
             busy_wait(colState, i_text, kernelId);
 
-        if (tid == 0 && startRow == 0)
+        if (tid == 0 && startRow == 0) // First row.
         {
-            // First row.
             _thisScores[tid] = -(i_text * gapPenalty);
             M[i_text] = DIR::LEFT;
         }
-        else if (tid == (diag_size-1) && i_text < numRows)
+        else if (tid == (diag_size-1) && i_text < numRows) // First column.
         {
-            // First column.
             _thisScores[tid] = -((tid + startRow) * gapPenalty);
             M[tid * numCols] = DIR::TOP;
+        }
+        else if (tid == 0) // Not first row of M, but first row in this kernel.
+        {
+            const char textByte = textBytes[threadInRowIdx - 1];
+            const int scoreMatrixIdx = ((int) textByte) * alphabetSize + ((int) patternByte);
+
+            _thisScores[tid] = choose_direction(_prevScores[tid],
+                                                colState[i_text].score,
+                                                colState[i_text - 1].score,
+                                                gapPenalty, _scoreMatrix[scoreMatrixIdx],
+                                                (M + (tid+startRow)*numCols + threadInRowIdx));
         }
         else if (tid < diag_size)
         {
@@ -107,11 +116,11 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
                                                 _prevScores[tid - 1],
                                                 _prevPrevScores[tid - 1],
                                                 gapPenalty, _scoreMatrix[scoreMatrixIdx],
-                                                (M + tid*numCols + threadInRowIdx));
+                                                (M + (tid+startRow)*numCols + threadInRowIdx));
         }
         __syncthreads();
 
-        if (tid == endRow && tid < diag_size)
+        if ((tid + startRow) == endRow && tid < diag_size)
             set_done(colState, threadInRowIdx, _thisScores[tid], kernelId);
     }
 
@@ -131,9 +140,9 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
                                                 _prevScores[tid - 1],
                                                 _prevPrevScores[tid - 1],
                                                 gapPenalty, _scoreMatrix[scoreMatrixIdx],
-                                                (M + tid*numCols + threadInRowIdx));
+                                                (M + (tid+startRow)*numCols + threadInRowIdx));
 
-            if (tid == endRow)
+            if ((tid + startRow) == endRow)
                 set_done(colState, threadInRowIdx, _thisScores[tid], kernelId);
         }
 
@@ -199,7 +208,7 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     }
     /** End Allocate and transfer memory */
 
-    const unsigned int sharedMemSize = 3 * numRows * sizeof(int) +
+    const unsigned int sharedMemSize = 3 * std::min(MAX_THREADS_PER_BLOCK, numRows) * sizeof(int) +
                                        request.alphabetSize * request.alphabetSize * sizeof(int);
 
     int startRow = 0;
