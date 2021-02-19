@@ -8,7 +8,25 @@
 #define NUM_REPEATS 20
 
 
-/// Initial version of the Needleman-Wunsch DP matrix filling algorithm.
+void fillDummyRequest(SequenceAlignment::Request &request, const uint64_t numRows, const uint64_t numCols)
+{
+    request.sequenceType = SequenceAlignment::programArgs::PROTEIN;
+    request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
+    request.alphabet = SequenceAlignment::PROTEIN_ALPHABET;
+    request.alphabetSize = SequenceAlignment::NUM_PROTEIN_CHARS;
+    request.gapPenalty = 5;
+    request.textNumBytes = numCols - 1;
+    request.patternNumBytes = numRows - 1;
+    request.textBytes = new char[request.textNumBytes];
+    request.patternBytes = new char[request.patternNumBytes];
+    auto fillWith = indexOfLetter('A', request.alphabet, request.alphabetSize);
+    std::fill_n(request.textBytes, request.textNumBytes, fillWith);
+    std::fill_n(request.patternBytes, request.patternNumBytes, fillWith);
+    parseScoreMatrixFile(SequenceAlignment::DEFAULT_PROTEIN_SCORE_MATRIX_FILE,
+                         request.alphabetSize, request.scoreMatrix);
+}
+
+/// Old GPU version of the Needleman-Wunsch DP matrix filling algorithm.
 /// This version exploits parallelism across a single row of of the matrix:
 ///     1. Check fromDiagScore in parallel.
 ///     2. Check fromTopScore in parallel.
@@ -86,30 +104,29 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
 }
 
 unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const unsigned int numCols,
-                                     const SequenceAlignment::Request &request, bool diagonal = true)
+                                      const SequenceAlignment::Request &request, bool diagonal = true)
 {
-    int *d_finalScore, *d_scoreMatrix, *d_lastRowScores;
-    char *d_textBytes, *d_patternBytes, *d_M, *d_columnState;
+    char *d_textBytes, *d_patternBytes, *d_M;
+    int *d_scoreMatrix, *d_finalScore;
+    columnState *d_columnState;
 
     auto freeMemory = [&]()
     {
-        cudaFree(d_finalScore);
-        cudaFree(d_scoreMatrix);
-        cudaFree(d_lastRowScores);
-        cudaFree(d_M);
         cudaFree(d_textBytes);
         cudaFree(d_patternBytes);
+        cudaFree(d_M);
+        cudaFree(d_scoreMatrix);
+        cudaFree(d_finalScore);
         cudaFree(d_columnState);
     };
 
     /** Allocate and transfer memory to device */
-    if (cudaMalloc(&d_finalScore, sizeof(int)) != cudaSuccess ||
-        cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
-        cudaMalloc(&d_lastRowScores, sizeof(int) * numCols) != cudaSuccess ||
+    if (cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
         cudaMalloc(&d_M, numRows * numCols) != cudaSuccess ||
         cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
         cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
-        cudaMalloc(&d_columnState, numCols) != cudaSuccess)
+        cudaMalloc(&d_columnState, numCols * sizeof(columnState)) != cudaSuccess ||
+        cudaMalloc(&d_finalScore, sizeof(int)) != cudaSuccess)
     {
         freeMemory();
         return 0;
@@ -127,14 +144,22 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
 
     if (diagonal)
     {
-        const unsigned int sharedMemSize = 3 * numRows * sizeof(int) +
-                                           request.alphabetSize * request.alphabetSize * sizeof(int);
-        const auto workerId = 0, startRow = 0;
-        cuda_fillMatrixNW<<<1, numRows, sharedMemSize>>>(d_textBytes, d_patternBytes,
-                                                         d_scoreMatrix, request.alphabetSize,
-                                                         request.gapPenalty, startRow, numRows,
-                                                         numCols, workerId, d_columnState,
-                                                         d_lastRowScores, d_M, d_finalScore);
+        const unsigned int sharedMemSize = 3 * std::min(MAX_THREADS_PER_BLOCK, numRows) * sizeof(int) +
+                                        request.alphabetSize * request.alphabetSize * sizeof(int);
+
+        int startRow = 0;
+        for (int i_kernel=0; i_kernel < (numRows/MAX_THREADS_PER_BLOCK + 1); ++i_kernel)
+        {
+            const int numThreads = std::min(MAX_THREADS_PER_BLOCK, numRows - startRow);
+            const int endRow = startRow + numThreads - 1;
+
+            cuda_fillMatrixNW<<<1, numThreads, sharedMemSize>>>(d_textBytes, d_patternBytes,
+                                                                d_scoreMatrix, request.alphabetSize,
+                                                                request.gapPenalty, startRow, endRow,
+                                                                numCols, i_kernel, d_columnState, d_M);
+
+            startRow = endRow + 1;
+        }
     }
     else
     {
@@ -148,6 +173,7 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
     if (cudaMemcpy(M, d_M, numRows*numCols, cudaMemcpyDeviceToHost) != cudaSuccess)
     {
         std::cout << "Could not copy back to host memory" << std::endl;
+        freeMemory();
         return 0;
     }
 
@@ -170,8 +196,7 @@ void benchmarkCudaFillMatrixNW_diagonal_vs_horizontal()
         std::make_pair(1024, 1024*2),
         std::make_pair(1024, 1024*4),
         std::make_pair(1024, 1024*8),
-        // std::make_pair(1024, 1024*16),
-        // std::make_pair(1024, 1024*32),
+        std::make_pair(1024, 1024*16),
     };
 
     for (const auto &sizePair : benchmarkSizes)
@@ -181,26 +206,25 @@ void benchmarkCudaFillMatrixNW_diagonal_vs_horizontal()
         std::cout << "-----  " << numRows << " x " << numCols << "  -----\n";
 
         SequenceAlignment::Request request;
-        request.sequenceType = SequenceAlignment::programArgs::PROTEIN;
-        request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
-        request.alphabet = SequenceAlignment::PROTEIN_ALPHABET;
-        request.alphabetSize = SequenceAlignment::NUM_PROTEIN_CHARS;
-        request.gapPenalty = 5;
-        request.textNumBytes = numCols - 1;
-        request.patternNumBytes = numRows - 1;
-        request.textBytes = new char[request.textNumBytes];
-        request.patternBytes = new char[request.patternNumBytes];
-        std::fill_n(request.textBytes, request.textNumBytes, 'A');
-        std::fill_n(request.patternBytes, request.patternNumBytes, 'A');
-        char *M = &(std::vector<char>(numRows * numCols))[0]; // Automatically clean-up M.
+        char *M;
+        try
+        {
+            fillDummyRequest(request, numRows, numCols);
+            M = &(std::vector<char>(numRows * numCols))[0]; // Automatically clean-up M.
+        }
+        catch(const std::bad_alloc& e)
+        {
+            std::cerr << SequenceAlignment::MEM_ERROR;
+            return;
+        }
 
         int totalTimeGPU_diagonal = 0;
         for (int i=0; i<NUM_REPEATS; ++i)
             totalTimeGPU_diagonal += wrapperCuda_fillMatrixNW(M, numRows, numCols, request);
 
         int totalTimeGPU_horizontal = 0;
-        // for (int i=0; i<NUM_REPEATS; ++i)
-        //     totalTimeGPU_horizontal += wrapperCuda_fillMatrixNW(M, numCols, numRows, request, false);
+        for (int i=0; i<NUM_REPEATS; ++i)
+            totalTimeGPU_horizontal += wrapperCuda_fillMatrixNW(M, numCols, numRows, request, false);
 
         std::cout << "GPU (diagonal) = " << (totalTimeGPU_diagonal/NUM_REPEATS) << " ms\n";
         std::cout << "GPU (horizontal) = " << (totalTimeGPU_horizontal/NUM_REPEATS) << " ms\n";
@@ -210,9 +234,13 @@ void benchmarkCudaFillMatrixNW_diagonal_vs_horizontal()
 
 void benchmarkFillMatrixNW_GPU_vs_CPU()
 {
-    std::vector<std::pair<int, int>> benchmarkSizes =
+    std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizes =
     {
-        std::make_pair(1024*2, 1024*2),
+        std::make_pair(1024, 1024*2),
+        std::make_pair(1024, 1024*4),
+        std::make_pair(1024, 1024*8),
+        std::make_pair(1024, 1024*16),
+        std::make_pair(1024*140, 1024*16),
     };
 
     for (const auto &sizePair : benchmarkSizes)
@@ -222,18 +250,17 @@ void benchmarkFillMatrixNW_GPU_vs_CPU()
         std::cout << "-----  " << numRows << " x " << numCols << "  -----\n";
 
         SequenceAlignment::Request request;
-        request.sequenceType = SequenceAlignment::programArgs::PROTEIN;
-        request.alignmentType = SequenceAlignment::programArgs::GLOBAL;
-        request.alphabet = SequenceAlignment::PROTEIN_ALPHABET;
-        request.alphabetSize = SequenceAlignment::NUM_PROTEIN_CHARS;
-        request.gapPenalty = 5;
-        request.textNumBytes = numCols - 1;
-        request.patternNumBytes = numRows - 1;
-        request.textBytes = new char[request.textNumBytes];
-        request.patternBytes = new char[request.patternNumBytes];
-        std::fill_n(request.textBytes, request.textNumBytes, 'A');
-        std::fill_n(request.patternBytes, request.patternNumBytes, 'A');
-        char *M = &(std::vector<char>(numRows * numCols))[0]; // Automatically clean-up M.
+        char *M;
+        try
+        {
+            fillDummyRequest(request, numRows, numCols);
+            M = &(std::vector<char>(numRows * numCols))[0]; // Automatically clean-up M.
+        }
+        catch(...)
+        {
+            std::cerr << SequenceAlignment::MEM_ERROR;
+            return;
+        }
 
         int totalTimeCPU = 0;
         for (int i=0; i<NUM_REPEATS; ++i)
@@ -252,16 +279,15 @@ void benchmarkFillMatrixNW_GPU_vs_CPU()
         std::cout << "CPU = " << (totalTimeCPU/NUM_REPEATS) << " ms\n";
         std::cout << "GPU = " << (totalTimeGPU/NUM_REPEATS) << " ms\n";
     }
-
 }
 
 
 
 int main(int argc, const char *argv[])
 {
-    benchmarkCudaFillMatrixNW_diagonal_vs_horizontal();
+    // benchmarkCudaFillMatrixNW_diagonal_vs_horizontal();
 
-    // benchmarkFillMatrixNW_GPU_vs_CPU();
+    benchmarkFillMatrixNW_GPU_vs_CPU();
 
 
     return 0;
