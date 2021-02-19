@@ -2,19 +2,19 @@
 
 #include "SequenceAlignment.hpp"
 
-constexpr unsigned int MAX_THREADS_PER_BLOCK = 1024;
+constexpr uint64_t MAX_THREADS_PER_BLOCK = 1024;
 
 using SequenceAlignment::DIR;
 
 struct columnState { int score; int kernelId; };
 
-__device__ __forceinline__ void set_done(columnState* volatile colState, const int col,
+__device__ __forceinline__ void set_done(columnState* volatile colState, const unsigned int col,
                                          const int score, const int kernelId)
 {
     colState[col] = {score, kernelId+1};
 }
 
-__device__ __forceinline__ void busy_wait(columnState* volatile colState, const int col,
+__device__ __forceinline__ void busy_wait(columnState* volatile colState, const unsigned int col,
                                           const int kernelId)
 {
     while (colState[col].kernelId != kernelId) continue;
@@ -43,7 +43,7 @@ __device__ __forceinline__ int choose_direction(const int leftScore,
     const int maxOverall = max(maxWithGap, fromDiagScore);
 
     const auto dirWithGap = (fromTopScore > fromLeftScore) ? DIR::TOP : DIR::LEFT;
-    directionStore[0] = (fromDiagScore > maxWithGap) ? DIR::DIAG : dirWithGap;
+    *directionStore = (fromDiagScore > maxWithGap) ? DIR::DIAG : dirWithGap;
 
     return maxOverall;
 }
@@ -155,8 +155,8 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
 void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &request,
                                                SequenceAlignment::Response *response)
 {
-    const unsigned int numCols = request.textNumBytes + 1;
-    const unsigned int numRows = request.patternNumBytes + 1;
+    const uint64_t numCols = request.textNumBytes + 1;
+    const uint64_t numRows = request.patternNumBytes + 1;
     char *M;
 
     /** Allocate host memory */
@@ -229,7 +229,6 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     // std::cout << "Num col: " << numCols << "\n";
     // std::cout << "Num bytes in shared: " << sharedMemSize << "\n";
 
-    cudaDeviceSynchronize();
     if (cudaMemcpy(&(response->score), &(d_columnState[numCols - 1].score), sizeof(int), cudaMemcpyDeviceToHost) != cudaSuccess ||
         cudaMemcpy(M, d_M, numRows*numCols, cudaMemcpyDeviceToHost) != cudaSuccess)
     {

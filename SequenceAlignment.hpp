@@ -82,10 +82,10 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         programArgs alignmentType;
         /// Buffer holding the text sequence.
         char *textBytes = nullptr;
-        int textNumBytes;
+        uint64_t textNumBytes;
         /// Buffer holding the pattern sequence.
         char *patternBytes = nullptr;
-        int patternNumBytes;
+        uint64_t patternNumBytes;
         /// Alphabet of the sequence.
         const char *alphabet; int alphabetSize;
         /// Substitution matrix stored in row major order.
@@ -108,7 +108,7 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         char *alignedTextBytes = nullptr;
         /// Buffer holding the aligned pattern sequence.
         char *alignedPatternBytes = nullptr;
-        int numAlignmentBytes;
+        uint64_t numAlignmentBytes;
         int score;
 
         ~Response()
@@ -127,9 +127,7 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
 
     void alignSequenceGlobalGPU(const Request&, Response*);
 
-    void traceBack(const char*, const unsigned int, const unsigned int, const Request&, Response*);
-
-    int fillMatrixNW(char*, const unsigned int, const unsigned int, const Request&);
+    void traceBack(const char*, const uint64_t, const uint64_t, const Request&, Response*);
 
 } // namespace SequenceAlignment
 

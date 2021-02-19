@@ -4,10 +4,12 @@
 #include <iterator>
 
 
-void SequenceAlignment::traceBack(const char *M, const unsigned int numRows, const unsigned int numCols,
+using SequenceAlignment::DIR;
+
+void SequenceAlignment::traceBack(const char *M, const uint64_t numRows, const uint64_t numCols,
                                   const Request &request, Response *response)
 {
-    int curr = numRows * numCols - 1;
+    uint64_t curr = numRows * numCols - 1;
     int textIndex = request.textNumBytes - 1;
     int patternIndex = request.patternNumBytes - 1;
 
@@ -47,8 +49,8 @@ void SequenceAlignment::traceBack(const char *M, const unsigned int numRows, con
 }
 
 
-int SequenceAlignment::fillMatrixNW(char *M, const unsigned int numRows, const unsigned int numCols,
-                                    const Request &request)
+int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
+                 const SequenceAlignment::Request &request)
 {
 
     int *thisRowScores;
@@ -65,9 +67,14 @@ int SequenceAlignment::fillMatrixNW(char *M, const unsigned int numRows, const u
         return 0;
     }
     /** End Allocate memory */
+    auto freeMemory = [&]()
+    {
+        delete [] thisRowScores;
+        delete [] prevRowScores;
+    };
 
     // Init first row.
-    for (unsigned int i_text = 0; i_text < numCols; ++i_text)
+    for (uint64_t i_text = 0; i_text < numCols; ++i_text)
     {
         thisRowScores[i_text] = i_text * -request.gapPenalty;
         M[i_text] = DIR::LEFT;
@@ -75,7 +82,7 @@ int SequenceAlignment::fillMatrixNW(char *M, const unsigned int numRows, const u
 
     // Dynamic programming loop
     auto thisRowM = M + numCols;
-    for (unsigned int i_pattern = 1; i_pattern < numRows; ++i_pattern)
+    for (uint64_t i_pattern = 1; i_pattern < numRows; ++i_pattern)
     {
         // Ping-pong score buffers.
         auto tmp = prevRowScores;
@@ -85,7 +92,7 @@ int SequenceAlignment::fillMatrixNW(char *M, const unsigned int numRows, const u
         thisRowScores[0] = i_pattern * -request.gapPenalty;
         thisRowM[0] = DIR::TOP;
 
-        for (unsigned int i_text = 1; i_text < numCols; ++i_text)
+        for (uint64_t i_text = 1; i_text < numCols; ++i_text)
         {
             // Get score for this letter combination. Note that i_text and i_pattern point one
             // beyond the actual text and pattern becuase of the gap character at the beginning.
@@ -115,8 +122,8 @@ int SequenceAlignment::fillMatrixNW(char *M, const unsigned int numRows, const u
     }
 
     auto score = thisRowScores[numCols -1];
-    delete [] thisRowScores;
-    delete [] prevRowScores;
+
+    freeMemory();
 
     return score;
 }
@@ -128,8 +135,8 @@ void SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request 
 
     char *M;
     /// Aditional row and column for the gap character.
-    const unsigned int numCols = request.textNumBytes + 1;
-    const unsigned int numRows = request.patternNumBytes + 1;
+    const uint64_t numCols = request.textNumBytes + 1;
+    const uint64_t numRows = request.patternNumBytes + 1;
 
     /** Allocate memory */
     try

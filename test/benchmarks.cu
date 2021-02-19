@@ -103,7 +103,7 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
         finalScore[0] = _thisScores[tid];
 }
 
-unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const unsigned int numCols,
+unsigned int wrapperCuda_fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
                                       const SequenceAlignment::Request &request, bool diagonal = true)
 {
     char *d_textBytes, *d_patternBytes, *d_M;
@@ -119,6 +119,13 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
         cudaFree(d_finalScore);
         cudaFree(d_columnState);
     };
+
+    auto numGlobalBytes = sizeof(int) * request.alphabetSize * request.alphabetSize +
+                            numRows * numCols +
+                            request.textNumBytes +
+                            request.patternNumBytes +
+                            numCols * sizeof(columnState);
+    std::cout << "Num gb bytes in global: " << (double)numGlobalBytes / 1000000000.0 << "\n";
 
     /** Allocate and transfer memory to device */
     if (cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
@@ -147,11 +154,11 @@ unsigned int wrapperCuda_fillMatrixNW(char *M, const unsigned int numRows, const
         const unsigned int sharedMemSize = 3 * std::min(MAX_THREADS_PER_BLOCK, numRows) * sizeof(int) +
                                         request.alphabetSize * request.alphabetSize * sizeof(int);
 
-        int startRow = 0;
+        unsigned int startRow = 0;
         for (int i_kernel=0; i_kernel < (numRows/MAX_THREADS_PER_BLOCK + 1); ++i_kernel)
         {
-            const int numThreads = std::min(MAX_THREADS_PER_BLOCK, numRows - startRow);
-            const int endRow = startRow + numThreads - 1;
+            const unsigned int numThreads = std::min(MAX_THREADS_PER_BLOCK, numRows - startRow);
+            const unsigned int endRow = startRow + numThreads - 1;
 
             cuda_fillMatrixNW<<<1, numThreads, sharedMemSize>>>(d_textBytes, d_patternBytes,
                                                                 d_scoreMatrix, request.alphabetSize,
@@ -210,9 +217,9 @@ void benchmarkCudaFillMatrixNW_diagonal_vs_horizontal()
         try
         {
             fillDummyRequest(request, numRows, numCols);
-            M = &(std::vector<char>(numRows * numCols))[0]; // Automatically clean-up M.
+            M = new char[numRows * numCols];
         }
-        catch(const std::bad_alloc& e)
+        catch(...)
         {
             std::cerr << SequenceAlignment::MEM_ERROR;
             return;
@@ -240,13 +247,13 @@ void benchmarkFillMatrixNW_GPU_vs_CPU()
         std::make_pair(1024, 1024*4),
         std::make_pair(1024, 1024*8),
         std::make_pair(1024, 1024*16),
-        std::make_pair(1024*140, 1024*16),
+        std::make_pair(1024*3, 1024*32),
     };
 
     for (const auto &sizePair : benchmarkSizes)
     {
-        auto numRows = sizePair.first;
-        auto numCols = sizePair.second;
+        uint64_t numRows = sizePair.first;
+        uint64_t numCols = sizePair.second;
         std::cout << "-----  " << numRows << " x " << numCols << "  -----\n";
 
         SequenceAlignment::Request request;
@@ -254,7 +261,7 @@ void benchmarkFillMatrixNW_GPU_vs_CPU()
         try
         {
             fillDummyRequest(request, numRows, numCols);
-            M = &(std::vector<char>(numRows * numCols))[0]; // Automatically clean-up M.
+            M = new char[numRows * numCols];
         }
         catch(...)
         {
@@ -271,13 +278,17 @@ void benchmarkFillMatrixNW_GPU_vs_CPU()
             auto end = std::chrono::steady_clock::now();
             totalTimeCPU += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
         }
+        std::cout << "CPU = " << (totalTimeCPU/NUM_REPEATS) << " ms\n";
 
         int totalTimeGPU = 0;
         for (int i=0; i<NUM_REPEATS; ++i)
+        {
             totalTimeGPU += wrapperCuda_fillMatrixNW(M, numRows, numCols, request);
-
-        std::cout << "CPU = " << (totalTimeCPU/NUM_REPEATS) << " ms\n";
+        }
         std::cout << "GPU = " << (totalTimeGPU/NUM_REPEATS) << " ms\n";
+
+
+        delete [] M;
     }
 }
 
