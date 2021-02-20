@@ -152,7 +152,7 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
 }
 
 
-void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &request,
+int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &request,
                                                SequenceAlignment::Response *response)
 {
     const uint64_t numCols = request.textNumBytes + 1;
@@ -169,7 +169,7 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     catch(const std::bad_alloc& e)
     {
         std::cerr << SequenceAlignment::MEM_ERROR;
-        return;
+        return -1;
     }
     /** End Allocate host memory */
 
@@ -196,7 +196,7 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     {
         std::cout << MEM_ERROR << std::endl;
         freeMemory();
-        return;
+        return -1;
     }
     if (cudaMemcpy(d_textBytes, request.textBytes, request.textNumBytes, cudaMemcpyHostToDevice) != cudaSuccess ||
         cudaMemcpy(d_patternBytes, request.patternBytes, request.patternNumBytes, cudaMemcpyHostToDevice) != cudaSuccess ||
@@ -204,9 +204,13 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     {
         std::cout << MEM_ERROR << std::endl;
         freeMemory();
-        return;
+        return -1;
     }
     /** End Allocate and transfer memory */
+
+    #ifdef BENCHMARK
+        auto begin = std::chrono::steady_clock::now();
+    #endif
 
     const unsigned int sharedMemSize = 3 * std::min(MAX_THREADS_PER_BLOCK, numRows) * sizeof(int) +
                                        request.alphabetSize * request.alphabetSize * sizeof(int);
@@ -234,11 +238,16 @@ void SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request 
     {
         std::cout << "Could not copy back to host memory" << std::endl;
         freeMemory();
-        return;
+        return -1;
     }
+    freeMemory();
+
+    #ifdef BENCHMARK
+        auto end = std::chrono::steady_clock::now();
+        return std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+    #endif
 
     traceBack(M, numRows, numCols, request, response);
 
-    freeMemory();
-
+    return 0;
 }

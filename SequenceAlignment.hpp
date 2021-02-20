@@ -123,9 +123,9 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     enum DIR { LEFT, DIAG, TOP};
 
 
-    void alignSequenceGlobalCPU(const Request&, Response*);
+    int alignSequenceGlobalCPU(const Request&, Response*);
 
-    void alignSequenceGlobalGPU(const Request&, Response*);
+    int alignSequenceGlobalGPU(const Request&, Response*);
 
     void traceBack(const char*, const uint64_t, const uint64_t, const Request&, Response*);
 

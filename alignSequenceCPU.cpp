@@ -52,7 +52,6 @@ void SequenceAlignment::traceBack(const char *M, const uint64_t numRows, const u
 int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
                  const SequenceAlignment::Request &request)
 {
-
     int *thisRowScores;
     int *prevRowScores;
     /** Allocate memory */
@@ -129,7 +128,7 @@ int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
 }
 
 
-void SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request &request,
+int SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request &request,
                                                SequenceAlignment::Response *response)
 {
 
@@ -149,7 +148,7 @@ void SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request 
     catch(const std::bad_alloc& e)
     {
         std::cerr << SequenceAlignment::MEM_ERROR;
-        return;
+        return -1;
     }
     /** End Allocate memory */
 
@@ -159,4 +158,6 @@ void SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request 
 
     /** De-allocate memory */
     delete [] M;
+
+    return 0;
 }

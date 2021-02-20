@@ -13,7 +13,7 @@ $(BIN) : mainDriver.cu utilities.cpp alignSequenceCPU.cpp alignSequenceGPU.cu Se
 $(TEST_BIN) : test/tests.cu utilities.cpp alignSequenceCPU.cpp alignSequenceGPU.cu SequenceAlignment.hpp
 		$(NVCC) $(CUDA_FLAGS) test/tests.cu -o $(TEST_BIN)
 
-$(BENCHMARK_BIN) : alignSequenceCPU.cpp alignSequenceGPU.cu SequenceAlignment.hpp test/benchmarks.cu
+$(BENCHMARK_BIN) : alignSequenceCPU.cpp alignSequenceGPU.cu SequenceAlignment.hpp test/benchmarks.cu test/old_alignSequenceGPU.cu
 		$(NVCC) $(CUDA_FLAGS) test/benchmarks.cu -o $(BENCHMARK_BIN)
 
 clean :
