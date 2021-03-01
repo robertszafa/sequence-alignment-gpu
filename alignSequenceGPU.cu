@@ -155,6 +155,57 @@ __global__ void cuda_fillMatrixNW(const char *textBytes, const char *patternByte
 }
 
 
+uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment::Response *response,
+                    char *&d_M0, char *&d_M1, char *&d_textBytes,
+                    char *&d_patternBytes, int *&d_scoreMatrix, columnState *&d_columnState,
+                    char *&h_M0, char *&h_M1, int *&h_score, char *&os_M, cudaStream_t &stream0)
+{
+    const uint64_t numCols = request.textNumBytes + 1;
+    const uint64_t numRows = request.patternNumBytes + 1;
+
+    try
+    {
+        os_M = new char[numRows * numCols];
+        response->alignedTextBytes = new char[2 * request.textNumBytes];
+        response->alignedPatternBytes = new char[2 * request.textNumBytes];
+    }
+    catch(const std::bad_alloc& e)
+    {
+        return 0;
+    }
+
+    auto numBytesGlobalGPU = [&] (int numThreads)
+    {
+        return sizeof(int) * request.alphabetSize * request.alphabetSize +  // scoreMatrix
+               2 * numThreads * numCols +                                   // M0, M1
+               request.textNumBytes + request.patternNumBytes +             // sequences
+               sizeof(columnState) * numCols;                               // columState
+    };
+
+    if (cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
+        cudaMalloc(&d_M0, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
+        cudaMalloc(&d_M1, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
+        cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
+        cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
+        cudaMalloc(&d_columnState, numCols * sizeof(columnState)) != cudaSuccess ||
+        cudaMallocHost(&h_M0, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
+        cudaMallocHost(&h_M1, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
+        cudaMallocHost(&h_score, sizeof(int)) != cudaSuccess)
+    {
+        return 0;
+    }
+    if (cudaMemcpyAsync(d_textBytes, request.textBytes, request.textNumBytes, cudaMemcpyHostToDevice, stream0) != cudaSuccess ||
+        cudaMemcpyAsync(d_patternBytes, request.patternBytes, request.patternNumBytes, cudaMemcpyHostToDevice, stream0) != cudaSuccess ||
+        cudaMemcpyAsync(d_scoreMatrix, request.scoreMatrix, sizeof(int) * (request.alphabetSize * request.alphabetSize), cudaMemcpyHostToDevice, stream0) != cudaSuccess)
+    {
+        return 0;
+    }
+
+    cudaMemsetAsync(d_columnState, 0, sizeof(columnState) * numCols, stream0);
+
+    return MAX_THREADS_PER_BLOCK;
+}
+
 int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &request,
                                                SequenceAlignment::Response *response)
 {
@@ -195,59 +246,32 @@ int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &
         if (os_M) delete [] os_M;
     };
 
-    try
+    const uint64_t NUM_THREADS_PER_BLOCK = initMemory(request, response, d_M0, d_M1,
+                                                    d_textBytes, d_patternBytes, d_scoreMatrix,
+                                                    d_columnState, h_M0, h_M1, h_score, os_M, stream0);
+    if (NUM_THREADS_PER_BLOCK == 0)
     {
-        os_M = new char[numRows * numCols];
-        response->alignedTextBytes = new char[2 * request.textNumBytes];
-        response->alignedPatternBytes = new char[2 * request.textNumBytes];
-    }
-    catch(const std::bad_alloc& e)
-    {
-        std::cerr << SequenceAlignment::MEM_ERROR;
+        std::cout << MEM_ERROR;
         cleanUp();
         return -1;
     }
 
-    if (cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
-        cudaMalloc(&d_M0, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
-        cudaMalloc(&d_M1, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
-        cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
-        cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
-        cudaMalloc(&d_columnState, numCols * sizeof(columnState)) != cudaSuccess ||
-        cudaMallocHost(&h_M0, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
-        cudaMallocHost(&h_M1, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
-        cudaMallocHost(&h_score, sizeof(int)) != cudaSuccess)
-    {
-        std::cout << MEM_ERROR << std::endl;
-        cleanUp();
-        return -1;
-    }
-    if (cudaMemcpyAsync(d_textBytes, request.textBytes, request.textNumBytes, cudaMemcpyHostToDevice, stream0) != cudaSuccess ||
-        cudaMemcpyAsync(d_patternBytes, request.patternBytes, request.patternNumBytes, cudaMemcpyHostToDevice, stream0) != cudaSuccess ||
-        cudaMemcpyAsync(d_scoreMatrix, request.scoreMatrix, sizeof(int) * (request.alphabetSize * request.alphabetSize), cudaMemcpyHostToDevice, stream0) != cudaSuccess)
-    {
-        std::cout << MEM_ERROR << std::endl;
-        cleanUp();
-        return -1;
-    }
+    cudaStreamSynchronize(stream0);
+    /** End Allocate and transfer memory */
 
-    cudaMemsetAsync(d_columnState, 0, sizeof(columnState) * numCols, stream0);
-    /** End Memory allocation and transfer. */
-
+    const unsigned int sharedMemSize = 3 * std::min(NUM_THREADS_PER_BLOCK, numRows) * sizeof(int) +
+                                       request.alphabetSize * request.alphabetSize * sizeof(int);
 
     #ifdef BENCHMARK
         auto begin = std::chrono::steady_clock::now();
     #endif
 
-    const unsigned int sharedMemSize = 3 * std::min(MAX_THREADS_PER_BLOCK, numRows) * sizeof(int) +
-                                       request.alphabetSize * request.alphabetSize * sizeof(int);
-
     int startRow = 0;
     cudaStream_t currStream;
     auto curr_os_M = os_M;
-    for (int i_kernel=0; i_kernel < (numRows/MAX_THREADS_PER_BLOCK + 1); ++i_kernel)
+    for (int i_kernel=0; i_kernel < (numRows/NUM_THREADS_PER_BLOCK + 1); ++i_kernel)
     {
-        const int numThreads = std::min(MAX_THREADS_PER_BLOCK, numRows - startRow);
+        const int numThreads = std::min(NUM_THREADS_PER_BLOCK, numRows - startRow);
         const int endRow = startRow + numThreads - 1;
 
         currStream = (i_kernel % 2 == 0) ? stream0 : stream1;
@@ -262,7 +286,7 @@ int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &
         // From device memory -> CUDA managed pinned memory -> OS managed swappable memory.
         if (cudaMemcpyAsync(curr_h_M, curr_d_M, numThreads*numCols, cudaMemcpyDeviceToHost, currStream) != cudaSuccess)
         {
-            std::cout << "error: could not copy from device memory 1\n";
+            std::cout << "error: could not copy from device memory\n";
             cudaDeviceSynchronize();
             cleanUp();
             return -1;
@@ -277,7 +301,7 @@ int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &
 
     if (cudaMemcpyAsync(h_score, &(d_columnState[numCols - 1].score), sizeof(int), cudaMemcpyDeviceToHost, currStream) != cudaSuccess)
     {
-        std::cout << "Could not copy back to host memory" << std::endl;
+        std::cout << "error: could not copy from device memory\n";
         cleanUp();
         return -1;
     }
@@ -286,6 +310,7 @@ int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &
     response->score = *h_score;
 
     #ifdef BENCHMARK
+        // If benchmraking, return the time taken instead of error code.
         auto end = std::chrono::steady_clock::now();
         cleanUp();
         return std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
