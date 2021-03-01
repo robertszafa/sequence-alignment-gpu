@@ -73,7 +73,7 @@ TEST_CASE("parseArguments")
     SECTION("incorrect score matrix")
     {
         const int argc = 5;
-        const char *argv[argc] = { "./alignSequence", "--score-matrix", "test/corruptScoreMatrix.txt",
+        const char *argv[argc] = { "./alignSequence", "--score-matrix", "tests/corruptScoreMatrix.txt",
                                    "data/dna/dna_01.txt", "data/dna/dna_02.txt"};
         SequenceAlignment::Request request;
         parseArguments(argc, argv, &request);

@@ -7,6 +7,8 @@
 
 main
 alignSequence
+test
+benchmark
 *.o
 *.tmp
 
@@ -14,6 +16,8 @@ alignSequence
 **/.DS_STORE
 runTests
 runBenchmarks
+test
+benchmark
 
 *.nvvp
 *.plist
