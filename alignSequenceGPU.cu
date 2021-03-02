@@ -182,14 +182,25 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
                sizeof(columnState) * numCols;                               // columState
     };
 
+    // Select a number of threads per block such that we fit into global memory.
+    uint64_t numThreads = MAX_THREADS_PER_BLOCK;
+    uint64_t freeGlobalMem = 0;
+    cudaMemGetInfo((size_t*) &freeGlobalMem, 0);
+    while (freeGlobalMem < numBytesGlobalGPU(numThreads))
+    {
+        numThreads -= 32;
+        if (numThreads < 32)
+            return 0;
+    }
+
     if (cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
-        cudaMalloc(&d_M0, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
-        cudaMalloc(&d_M1, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
+        cudaMalloc(&d_M0, numThreads * numCols) != cudaSuccess ||
+        cudaMalloc(&d_M1, numThreads * numCols) != cudaSuccess ||
         cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
         cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
         cudaMalloc(&d_columnState, numCols * sizeof(columnState)) != cudaSuccess ||
-        cudaMallocHost(&h_M0, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
-        cudaMallocHost(&h_M1, MAX_THREADS_PER_BLOCK * numCols) != cudaSuccess ||
+        cudaMallocHost(&h_M0, numThreads * numCols) != cudaSuccess ||
+        cudaMallocHost(&h_M1, numThreads * numCols) != cudaSuccess ||
         cudaMallocHost(&h_score, sizeof(int)) != cudaSuccess)
     {
         return 0;
@@ -203,7 +214,7 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
 
     cudaMemsetAsync(d_columnState, 0, sizeof(columnState) * numCols, stream0);
 
-    return MAX_THREADS_PER_BLOCK;
+    return numThreads;
 }
 
 int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &request,
