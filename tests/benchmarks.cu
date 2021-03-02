@@ -9,6 +9,8 @@
 #include <utility>
 #include <chrono>
 
+#include <stdlib.h>
+
 
 void fillDummyRequest(SequenceAlignment::Request &request, const uint64_t numRows, const uint64_t numCols)
 {
@@ -21,9 +23,13 @@ void fillDummyRequest(SequenceAlignment::Request &request, const uint64_t numRow
     request.patternNumBytes = numRows - 1;
     request.textBytes = new char[request.textNumBytes];
     request.patternBytes = new char[request.patternNumBytes];
-    auto fillWith = indexOfLetter('A', request.alphabet, request.alphabetSize);
-    std::fill_n(request.textBytes, request.textNumBytes, fillWith);
-    std::fill_n(request.patternBytes, request.patternNumBytes, fillWith);
+
+    // Fill with random letters from alphabet, translated to indices.
+    for (int i=0; i<request.textNumBytes; ++i)
+        request.textBytes[i] = rand() % request.alphabetSize;
+    for (int i=0; i<request.patternNumBytes; ++i)
+        request.patternBytes[i] = rand() % request.alphabetSize;
+
     parseScoreMatrixFile(SequenceAlignment::DEFAULT_PROTEIN_SCORE_MATRIX_FILE,
                          request.alphabetSize, request.scoreMatrix);
 }
@@ -33,12 +39,11 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
 {
     std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizes =
     {
-        // std::make_pair(1024, 1024*2),
-        // std::make_pair(1024, 1024*4),
-        // std::make_pair(1024, 1024*8),
-        // std::make_pair(1024, 1024*16),
-        // std::make_pair(4000, 16000),
-        std::make_pair(1024, 1024*10),
+        std::make_pair(1024, 1024*2),
+        std::make_pair(1024, 1024*4),
+        std::make_pair(1024, 1024*8),
+        std::make_pair(1024, 1024*16),
+        std::make_pair(4000, 16000),
     };
 
     for (const auto &sizePair : benchmarkSizes)
