@@ -52,8 +52,17 @@ void SequenceAlignment::traceBack(const char *M, const uint64_t numRows, const u
 int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
                  const SequenceAlignment::Request &request)
 {
-    int *thisRowScores;
-    int *prevRowScores;
+    int *thisRowScores = nullptr;
+    int *prevRowScores = nullptr;
+
+    auto cleanUp = [&]()
+    {
+        if (thisRowScores) delete [] thisRowScores;
+        if (prevRowScores) delete [] prevRowScores;
+        thisRowScores = nullptr;
+        prevRowScores = nullptr;
+    };
+
     /** Allocate memory */
     try
     {
@@ -63,14 +72,10 @@ int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
     catch(const std::bad_alloc& e)
     {
         std::cerr << SequenceAlignment::MEM_ERROR;
+        cleanUp();
         return 0;
     }
     /** End Allocate memory */
-    auto freeMemory = [&]()
-    {
-        delete [] thisRowScores;
-        delete [] prevRowScores;
-    };
 
     // Init first row.
     for (uint64_t i_text = 0; i_text < numCols; ++i_text)
@@ -122,7 +127,7 @@ int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
 
     auto score = thisRowScores[numCols -1];
 
-    freeMemory();
+    cleanUp();
 
     return score;
 }
@@ -132,10 +137,16 @@ int SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request &
                                                SequenceAlignment::Response *response)
 {
 
-    char *M;
+    char *M = nullptr;
     /// Aditional row and column for the gap character.
     const uint64_t numCols = request.textNumBytes + 1;
     const uint64_t numRows = request.patternNumBytes + 1;
+
+    auto cleanUp = [&] ()
+    {
+        if (M) delete [] M;
+        M = nullptr;
+    };
 
     /** Allocate memory */
     try
@@ -148,6 +159,7 @@ int SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request &
     catch(const std::bad_alloc& e)
     {
         std::cerr << SequenceAlignment::MEM_ERROR;
+        cleanUp();
         return -1;
     }
     /** End Allocate memory */
@@ -156,8 +168,7 @@ int SequenceAlignment::alignSequenceGlobalCPU(const SequenceAlignment::Request &
 
     traceBack(M, numRows, numCols, request, response);
 
-    /** De-allocate memory */
-    delete [] M;
+    cleanUp();
 
     return 0;
 }

@@ -253,14 +253,14 @@ int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &
 
     /** Memory allocation and transfer. */
     // OS managed memory (can be swapped to disk).
-    char *os_M;
+    char *os_M = nullptr;
     // CUDA managed host memory, pinned to physical mem address and not swappable.
-    char *h_M0, *h_M1;
-    int *h_score;
+    char *h_M0 = nullptr, *h_M1 = nullptr;
+    int *h_score = nullptr;
     // Device memory.
-    char *d_textBytes, *d_patternBytes, *d_M0, *d_M1;
-    int *d_scoreMatrix;
-    columnState *d_columnState;
+    char *d_textBytes = nullptr, *d_patternBytes = nullptr, *d_M0 = nullptr, *d_M1 = nullptr;
+    int *d_scoreMatrix = nullptr;
+    columnState *d_columnState = nullptr;
 
     auto cleanUp = [&]()
     {
@@ -273,12 +273,21 @@ int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &
         if (d_M1) cudaFree(d_M1);
         if (d_scoreMatrix) cudaFree(d_scoreMatrix);
         if (d_columnState) cudaFree(d_columnState);
-
         if (h_M0) cudaFreeHost(h_M0);
         if (h_M1) cudaFreeHost(h_M1);
         if (h_score) cudaFreeHost(h_score);
-
         if (os_M) delete [] os_M;
+
+        d_textBytes = nullptr;
+        d_patternBytes = nullptr;
+        d_M0 = nullptr;
+        d_M1 = nullptr;
+        d_scoreMatrix = nullptr;
+        d_columnState = nullptr;
+        h_M0 = nullptr;
+        h_M1 = nullptr;
+        h_score = nullptr;
+        os_M = nullptr;
     };
 
     const uint64_t NUM_THREADS_PER_BLOCK = initMemory(request, response, d_M0, d_M1, d_textBytes,
