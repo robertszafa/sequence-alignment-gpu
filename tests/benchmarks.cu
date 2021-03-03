@@ -1,6 +1,7 @@
 #define BENCHMARK
 /// Number of times an experiment is ran. Then the average is taken.
 #define NUM_REPEATS 20
+#define NUM_WARMUPS 3
 
 #include "../SequenceAlignment.hpp"
 #include "old_alignSequenceGPU.cu"
@@ -26,9 +27,9 @@ void fillDummyRequest(SequenceAlignment::Request &request, const uint64_t numRow
 
     // Fill with random letters from alphabet, translated to indices.
     for (int i=0; i<request.textNumBytes; ++i)
-        request.textBytes[i] = rand() % request.alphabetSize;
+        request.textBytes[i] = rand() % (request.alphabetSize-1);
     for (int i=0; i<request.patternNumBytes; ++i)
-        request.patternBytes[i] = rand() % request.alphabetSize;
+        request.patternBytes[i] = rand() % (request.alphabetSize-1);
 
     parseScoreMatrixFile(SequenceAlignment::DEFAULT_PROTEIN_SCORE_MATRIX_FILE,
                          request.alphabetSize, request.scoreMatrix);
@@ -44,6 +45,7 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
         std::make_pair(1024, 1024*8),
         std::make_pair(1024, 1024*16),
         std::make_pair(4000, 16000),
+        // std::make_pair(14000, 160000),
     };
 
     for (const auto &sizePair : benchmarkSizes)
@@ -60,6 +62,8 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
         int totalTimeCPU = 0;
         if (cpu)
         {
+            for (int i=0; i<NUM_WARMUPS; ++i)
+                fillMatrixNW(M, numRows, numCols, request);
             for (int i=0; i<NUM_REPEATS; ++i)
             {
                 auto begin = std::chrono::steady_clock::now();
@@ -69,25 +73,29 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
             }
             std::cout << "CPU = " << (totalTimeCPU/NUM_REPEATS) << " ms\n";
         }
+        auto cpuScore = response.score;
+        response.score = -1;
 
         int totalTimeGPU = 0;
         if (gpu)
         {
+            for (int i=0; i<NUM_WARMUPS; ++i)
+                SequenceAlignment::alignSequenceGlobalGPU(request, &response);
             for (int i=0; i<NUM_REPEATS; ++i)
                 totalTimeGPU += SequenceAlignment::alignSequenceGlobalGPU(request, &response);
             std::cout << "GPU = " << (totalTimeGPU/NUM_REPEATS) << " ms\n";
         }
-        auto cpuScore = response.score;
-        response.score = -1;
+        auto gpuScore = response.score;
 
         int totalTimeGPU_horizontal = 0;
         if (old_gpu)
         {
+            for (int i=0; i<NUM_WARMUPS; ++i)
+                old_alignSequenceGlobalGPU(request, &response);
             for (int i=0; i<NUM_REPEATS; ++i)
                 totalTimeGPU_horizontal += old_alignSequenceGlobalGPU(request, &response);
             std::cout << "GPU (horizontal) = " << (totalTimeGPU_horizontal/NUM_REPEATS) << " ms\n";
         }
-        auto gpuScore = response.score;
 
         std::cout << "GPU Speedup = " << (double(totalTimeCPU)/double(totalTimeGPU)) << "\n";
         std::cout << "Result correct? : " << (cpuScore == gpuScore) << "\n";

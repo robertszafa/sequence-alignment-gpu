@@ -100,7 +100,7 @@ int parseScoreMatrixFile(const std::string& fname, const int alphabetSize, int *
         {
             for (int j = 0; j < alphabetSize; ++j)
             {
-                // Check if 16-bit number.
+                // Check if valid integer number.
                 if (!(f >> nextScore)) return -1;
 
                 buffer[i*alphabetSize + j] = nextScore;
