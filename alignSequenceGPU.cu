@@ -234,7 +234,7 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
     return numThreads;
 }
 
-int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &request,
+int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &request,
                                                SequenceAlignment::Response *response)
 {
     const uint64_t numCols = request.textNumBytes + 1;
@@ -361,7 +361,7 @@ int SequenceAlignment::alignSequenceGlobalGPU(const SequenceAlignment::Request &
         return std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
     #endif
 
-    traceBack(os_M, numRows, numCols, request, response);
+    traceBackNW(os_M, numRows, numCols, request, response);
 
     cleanUp();
 

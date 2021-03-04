@@ -14,12 +14,12 @@ int main(int argc, const char *argv[])
     if (request.deviceType == SequenceAlignment::programArgs::CPU &&
         request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
     {
-        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+        SequenceAlignment::alignSequenceCPU(request, &response);
     }
     else if (request.deviceType == SequenceAlignment::programArgs::GPU &&
              request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
     {
-        SequenceAlignment::alignSequenceGlobalGPU(request, &response);
+        SequenceAlignment::alignSequenceGPU(request, &response);
     }
 
     prettyAlignmentPrint(response, std::cout);

@@ -75,7 +75,7 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
         finalScore[0] = _thisScores[tid];
 }
 
-int old_alignSequenceGlobalGPU(const SequenceAlignment::Request &request,
+int old_alignSequenceGPU(const SequenceAlignment::Request &request,
                                SequenceAlignment::Response *response)
 {
     const uint64_t numRows = request.textNumBytes + 1;

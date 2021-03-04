@@ -120,14 +120,16 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         }
     };
 
-    enum DIR { LEFT, DIAG, TOP};
+    enum DIR { LEFT, DIAG, TOP, STOP};
 
 
-    int alignSequenceGlobalCPU(const Request&, Response*);
+    int alignSequenceCPU(const Request&, Response*);
 
-    int alignSequenceGlobalGPU(const Request&, Response*);
+    int alignSequenceGPU(const Request&, Response*);
 
-    void traceBack(const char*, const uint64_t, const uint64_t, const Request&, Response*);
+    void traceBackNW(const char*, const uint64_t, const uint64_t, const Request&, Response*);
+
+    void traceBackSW(const char*, const uint64_t, const uint64_t, const uint64_t, const Request&, Response*);
 
 } // namespace SequenceAlignment
 

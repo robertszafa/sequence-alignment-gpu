@@ -87,7 +87,7 @@ TEST_CASE("parseArguments")
     std::cerr.rdbuf(old);
 }
 
-TEST_CASE("alignSequenceGlobalCPU")
+TEST_CASE("alignSequenceCPU - Global")
 {
 
     SECTION("DNA_01")
@@ -99,7 +99,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         SequenceAlignment::Response response;
         parseArguments(argc, argv, &request);
 
-        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+        SequenceAlignment::alignSequenceCPU(request, &response);
 
         // Don't check the aligned sequences since there can be multiple alignments with the same score.
         const int expectedScore = -4;
@@ -127,7 +127,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         std::copy_n(pattern.begin(), request.patternNumBytes, request.patternBytes);
         parseScoreMatrixFile(SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
 
-        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+        SequenceAlignment::alignSequenceCPU(request, &response);
 
         // Don't check the aligned sequences since there can be multiple alignments with the same score.
         const int expectedScore = -4;
@@ -155,7 +155,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         std::copy_n(pattern.begin(), request.patternNumBytes, request.patternBytes);
         parseScoreMatrixFile(SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
 
-        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+        SequenceAlignment::alignSequenceCPU(request, &response);
 
         // Don't check the aligned sequences since there can be multiple alignments with the same score.
         const int expectedScore = 2;
@@ -193,7 +193,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         std::copy_n(pattern.begin(), request.patternNumBytes, request.patternBytes);
         parseScoreMatrixFile(SequenceAlignment::DEFAULT_DNA_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
 
-        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+        SequenceAlignment::alignSequenceCPU(request, &response);
 
         auto gotAlignedText = std::string(response.alignedTextBytes,
                                           (response.alignedTextBytes + response.numAlignmentBytes));
@@ -214,7 +214,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         SequenceAlignment::Response response;
         parseArguments(argc, argv, &request);
 
-        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+        SequenceAlignment::alignSequenceCPU(request, &response);
 
         // Don't check the aligned sequences since there can be multiple alignments with the same score.
         const int expectedScore = 2673;
@@ -253,7 +253,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         std::copy_n(pattern.begin(), request.patternNumBytes, request.patternBytes);
         parseScoreMatrixFile(SequenceAlignment::DEFAULT_PROTEIN_SCORE_MATRIX_FILE, request.alphabetSize, request.scoreMatrix);
 
-        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+        SequenceAlignment::alignSequenceCPU(request, &response);
 
         auto gotAlignedText = std::string(response.alignedTextBytes,
                                           (response.alignedTextBytes + response.numAlignmentBytes));
@@ -274,7 +274,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         SequenceAlignment::Response response;
         parseArguments(argc, argv, &request);
 
-        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+        SequenceAlignment::alignSequenceCPU(request, &response);
 
         // Don't check the aligned sequences since there can be multiple alignments with the same score.
         const int expectedScore = 32095;
@@ -290,7 +290,7 @@ TEST_CASE("alignSequenceGlobalCPU")
         SequenceAlignment::Response response;
         parseArguments(argc, argv, &request);
 
-        SequenceAlignment::alignSequenceGlobalCPU(request, &response);
+        SequenceAlignment::alignSequenceCPU(request, &response);
 
         // Don't check the aligned sequences since there can be multiple alignments with the same score.
         const int expectedScore = 1195;
@@ -299,8 +299,29 @@ TEST_CASE("alignSequenceGlobalCPU")
 
 }
 
+TEST_CASE("alignSequenceCPU - Local")
+{
 
-TEST_CASE("alignSequenceGlobalGPU")
+    SECTION("DNA_01")
+    {
+        const int argc = 6;
+        const char *argv[argc] = { "./alignSequence",  "--gap-penalty", "5", "--local",
+                                "data/dna/mutated_NC_018874.txt", "data/dna/dna_01.txt"};
+        SequenceAlignment::Request request;
+        SequenceAlignment::Response response;
+        parseArguments(argc, argv, &request);
+
+        SequenceAlignment::alignSequenceCPU(request, &response);
+
+        // Don't check the aligned sequences since there can be multiple alignments with the same score.
+        const int expectedScore = 20;
+        REQUIRE(expectedScore == response.score);
+    }
+}
+
+
+
+TEST_CASE("alignSequenceGPU - Global")
 {
     SECTION("PROTEIN_01")
     {
@@ -312,8 +333,8 @@ TEST_CASE("alignSequenceGlobalGPU")
 
         SequenceAlignment::Response responseGPU;
         SequenceAlignment::Response responseCPU;
-        SequenceAlignment::alignSequenceGlobalGPU(request, &responseGPU);
-        SequenceAlignment::alignSequenceGlobalCPU(request, &responseCPU);
+        SequenceAlignment::alignSequenceGPU(request, &responseGPU);
+        SequenceAlignment::alignSequenceCPU(request, &responseCPU);
 
         REQUIRE(responseCPU.score == responseGPU.score);
         REQUIRE(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
@@ -332,8 +353,8 @@ TEST_CASE("alignSequenceGlobalGPU")
 
         SequenceAlignment::Response responseGPU;
         SequenceAlignment::Response responseCPU;
-        SequenceAlignment::alignSequenceGlobalGPU(request, &responseGPU);
-        SequenceAlignment::alignSequenceGlobalCPU(request, &responseCPU);
+        SequenceAlignment::alignSequenceGPU(request, &responseGPU);
+        SequenceAlignment::alignSequenceCPU(request, &responseCPU);
 
         REQUIRE(responseCPU.score == responseGPU.score);
         REQUIRE(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
@@ -342,25 +363,27 @@ TEST_CASE("alignSequenceGlobalGPU")
                 std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
     }
 
-    SECTION("DNA_01")
-    {
-        const int argc = 8;
-        const char *argv[argc] = {"./alignSequence", "--dna", "--gpu", "--gap-penalty", "5", "--global",
-                                  "data/dna/AbHV_ORF111.txt", "data/protein/mutated_AbHV_ORF111.txt"};
-        SequenceAlignment::Request request = {};
-        parseArguments(argc, argv, &request);
 
-        // SequenceAlignment::Response responseGPU;
-        SequenceAlignment::Response responseCPU;
-        // SequenceAlignment::alignSequenceGlobalGPU(request, &responseGPU);
-        SequenceAlignment::alignSequenceGlobalCPU(request, &responseCPU);
+    // 200k sequence test
+    // SECTION("DNA_01")
+    // {
+    //     const int argc = 8;
+    //     const char *argv[argc] = {"./alignSequence", "--dna", "--gpu", "--gap-penalty", "5", "--global",
+    //                               "data/dna/AbHV_ORF111.txt", "data/dna/mutated_AbHV_ORF111.txt"};
+    //     SequenceAlignment::Request request = {};
+    //     parseArguments(argc, argv, &request);
 
-        // REQUIRE(responseCPU.score == responseGPU.score);
-        // REQUIRE(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
-        //         std::string(responseGPU.alignedTextBytes, (responseGPU.alignedTextBytes + responseGPU.numAlignmentBytes)));
-        // REQUIRE(std::string(responseCPU.alignedPatternBytes, (responseCPU.alignedPatternBytes + responseCPU.numAlignmentBytes)) ==
-        //         std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
-    }
+    //     SequenceAlignment::Response responseGPU;
+    //     SequenceAlignment::Response responseCPU;
+    //     SequenceAlignment::alignSequenceGPU(request, &responseGPU);
+    //     SequenceAlignment::alignSequenceCPU(request, &responseCPU);
+
+    //     REQUIRE(responseCPU.score == responseGPU.score);
+    //     REQUIRE(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
+    //             std::string(responseGPU.alignedTextBytes, (responseGPU.alignedTextBytes + responseGPU.numAlignmentBytes)));
+    //     REQUIRE(std::string(responseCPU.alignedPatternBytes, (responseCPU.alignedPatternBytes + responseCPU.numAlignmentBytes)) ==
+    //             std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
+    // }
 
 }
 
