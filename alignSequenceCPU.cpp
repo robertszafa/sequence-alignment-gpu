@@ -10,11 +10,10 @@ using SequenceAlignment::DIR;
 void SequenceAlignment::traceBackSW(const char *M, const uint64_t start, const uint64_t numRows,
                                     const uint64_t numCols, const Request &request, Response *response)
 {
-    int textIndex = start % numCols;
-    int patternIndex = start / numRows;
+    int textIndex = (start % numCols) - 1;
+    int patternIndex = (start / numCols) - 1;
 
     response->numAlignmentBytes = 0;
-
 
     auto curr = start;
     while (M[curr] != DIR::STOP)
@@ -35,15 +34,21 @@ void SequenceAlignment::traceBackSW(const char *M, const uint64_t start, const u
 
         response->numAlignmentBytes += 1;
 
-        // Update text and pattern indices depending which one was used.
-        textIndex = std::max(0, textIndex - takeText);
-        patternIndex = std::max(0, patternIndex - takePattern);
         // Go to next cell.
         curr -= (M[curr] == DIR::LEFT) +
                 ((M[curr] == DIR::DIAG) * (numCols+1)) +
                 ((M[curr] == DIR::TOP) * (numCols));
+
+        // Update text and pattern indices depending which one was used.
+        if (M[curr] != DIR::STOP)
+        {
+            textIndex = std::max(0, textIndex - takeText);
+            patternIndex = std::max(0, patternIndex - takePattern);
+        }
     }
 
+    response->startInAlignedText = textIndex;
+    response->startInAlignedPattern = patternIndex;
     std::reverse(response->alignedTextBytes,
                  (response->alignedTextBytes + response->numAlignmentBytes));
     std::reverse(response->alignedPatternBytes,
@@ -86,6 +91,8 @@ void SequenceAlignment::traceBackNW(const char *M, const uint64_t numRows, const
                 ((M[curr] == DIR::TOP) * (numCols));
     }
 
+    response->startInAlignedText = textIndex;
+    response->startInAlignedPattern = patternIndex;
     std::reverse(response->alignedTextBytes,
                  (response->alignedTextBytes + response->numAlignmentBytes));
     std::reverse(response->alignedPatternBytes,
@@ -167,7 +174,7 @@ std::pair<int, uint64_t> fillMatrixSW(char *M, const uint64_t numRows, const uin
             const auto dirNonZeroScore = isFromLeft * DIR::LEFT + isFromDiag * DIR::DIAG + isFromTop * DIR::TOP;
             thisRowM[i_text] = bestScore > 0 ? dirNonZeroScore : DIR::STOP;
             thisRowScores[i_text] = std::max(0, bestScore);
-            maxIJ = thisRowScores[i_text] > maxScore ? (i_pattern * i_text) : maxIJ;
+            maxIJ = thisRowScores[i_text] > maxScore ? (i_pattern * numCols + i_text) : maxIJ;
             maxScore = std::max(maxScore, thisRowScores[i_text]);
         }
 
@@ -264,7 +271,7 @@ int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
 
 
 int SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &request,
-                                               SequenceAlignment::Response *response)
+                                        SequenceAlignment::Response *response)
 {
 
     char *M = nullptr;

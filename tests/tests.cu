@@ -301,11 +301,10 @@ TEST_CASE("alignSequenceCPU - Global")
 
 TEST_CASE("alignSequenceCPU - Local")
 {
-
     SECTION("DNA_01")
     {
         const int argc = 6;
-        const char *argv[argc] = { "./alignSequence",  "--gap-penalty", "5", "--local",
+        const char *argv[argc] = { "./alignSequence", "--gap-penalty", "5", "--local",
                                 "data/dna/mutated_NC_018874.txt", "data/dna/dna_01.txt"};
         SequenceAlignment::Request request;
         SequenceAlignment::Response response;
@@ -313,13 +312,34 @@ TEST_CASE("alignSequenceCPU - Local")
 
         SequenceAlignment::alignSequenceCPU(request, &response);
 
-        // Don't check the aligned sequences since there can be multiple alignments with the same score.
-        const int expectedScore = 20;
-        REQUIRE(expectedScore == response.score);
+        auto gotAlignedText = std::string(response.alignedTextBytes,
+                                          (response.alignedTextBytes + response.numAlignmentBytes));
+        auto gotAlignedPattern = std::string(response.alignedPatternBytes,
+                                             (response.alignedPatternBytes + response.numAlignmentBytes));
+        REQUIRE(20 == response.score);
+        REQUIRE("ACAC" == gotAlignedText);
+        REQUIRE("ACAC" == gotAlignedPattern);
+        REQUIRE(64 == response.startInAlignedText);
+        REQUIRE(0 == response.startInAlignedPattern);
     }
+
+    SECTION("PROTEIN_01")
+    {
+        const int argc = 7;
+        const char *argv[argc] = {"./alignSequence", "--protein", "--gap-penalty", "5", "--local",
+                                  "data/protein/mutated_P0C6B8.txt", "data/protein/mutated_P0.txt"};
+        SequenceAlignment::Request request;
+        SequenceAlignment::Response response;
+        parseArguments(argc, argv, &request);
+
+        SequenceAlignment::alignSequenceCPU(request, &response);
+
+        REQUIRE(77 == response.score);
+        REQUIRE(4235 == response.startInAlignedText);
+        REQUIRE(11 == response.startInAlignedPattern);
+    }
+
 }
-
-
 
 TEST_CASE("alignSequenceGPU - Global")
 {

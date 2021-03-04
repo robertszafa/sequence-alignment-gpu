@@ -36,10 +36,11 @@ int validateAndTransform(std::string &sequence, const char *alphabet, const int 
         // Ignore characters not on the A-Z range.
         if (upperLetter < 65 || upperLetter > 90) continue;
 
+        // {numRead} will always be <= {i}, so we can do the following.
         sequence[numRead] = indexOfLetter(upperLetter, alphabet, alphabetSize);
         if (sequence[numRead] == -1)
         {
-            std::cerr << "'" << sequence[i] << "'" << " letter not in alphabet." << std::endl;
+            std::cerr << "'" << upperLetter << "'" << " letter not in alphabet." << std::endl;
             return 0;
         }
 
@@ -228,6 +229,15 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
 }
 
 
+/// Given 2 aligned sequences in response, pretty-print them along statistics. E.g.:
+/// 1 ACAC   4
+///   ||||
+/// 1 ACAC   4
+///
+/// # Length: 	4
+/// # Identity: 	4/4 (100%)
+/// # Gaps: 	0/4 (0%)
+/// # Score: 	20
 void prettyAlignmentPrint(SequenceAlignment::Response &response, std::ostream &stream)
 {
     if (response.numAlignmentBytes == 0) return;
@@ -235,13 +245,16 @@ void prettyAlignmentPrint(SequenceAlignment::Response &response, std::ostream &s
     const unsigned int CHARS_PER_LINE = 50;
 
     int charNumWidth = 0;
-    int maxI = response.numAlignmentBytes;
+    int maxI = response.numAlignmentBytes +
+               std::max(response.startInAlignedText, response.startInAlignedPattern);
+    // Max width of sequence indexes at beginning of line.
     do { maxI /= 10; ++charNumWidth; } while (maxI != 0);
 
     int numIdentity = 0, numGaps = 0;
     for (int i = 0; i < response.numAlignmentBytes; i += CHARS_PER_LINE)
     {
-        stream << std::setfill(' ') << std::setw(charNumWidth) << (i + 1) << " "
+        auto textIdx = i + 1 + response.startInAlignedText;
+        stream << std::setfill(' ') << std::setw(charNumWidth) << textIdx << " "
                << std::resetiosflags(std::ios::showbase);
 
         int j = i;
@@ -249,7 +262,8 @@ void prettyAlignmentPrint(SequenceAlignment::Response &response, std::ostream &s
         {
             stream << response.alignedTextBytes[j];
         }
-        stream << "   " << j
+        auto patternIdx = j + response.startInAlignedPattern;
+        stream << "   " << patternIdx
                << " \n" << std::setfill(' ') << std::setw(charNumWidth) << " " << " "
                << std::resetiosflags(std::ios::showbase);
 

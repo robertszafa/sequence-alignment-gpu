@@ -11,16 +11,10 @@ int main(int argc, const char *argv[])
     if (parseArguments(argc, argv, &request) == -1) return -1;
 
     // Runtime dispatch based on device and alignment algorithm.
-    if (request.deviceType == SequenceAlignment::programArgs::CPU &&
-        request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
-    {
+    if (request.deviceType == SequenceAlignment::programArgs::CPU)
         SequenceAlignment::alignSequenceCPU(request, &response);
-    }
-    else if (request.deviceType == SequenceAlignment::programArgs::GPU &&
-             request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
-    {
+    else if (request.deviceType == SequenceAlignment::programArgs::GPU)
         SequenceAlignment::alignSequenceGPU(request, &response);
-    }
 
     prettyAlignmentPrint(response, std::cout);
 

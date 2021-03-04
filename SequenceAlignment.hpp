@@ -109,6 +109,9 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         /// Buffer holding the aligned pattern sequence.
         char *alignedPatternBytes = nullptr;
         uint64_t numAlignmentBytes;
+        /// Start index indicating of aligned sequence;
+        uint64_t startInAlignedText;
+        uint64_t startInAlignedPattern;
         int score;
 
         ~Response()
