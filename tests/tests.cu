@@ -407,3 +407,28 @@ TEST_CASE("alignSequenceGPU - Global")
 
 }
 
+
+TEST_CASE("alignSequenceGPU - Local")
+{
+    SECTION("DNA_01")
+    {
+        const int argc = 6;
+        const char *argv[argc] = { "./alignSequence", "--gap-penalty", "5", "--local",
+                                "data/dna/mutated_NC_018874.txt", "data/dna/dna_01.txt"};
+        SequenceAlignment::Request request;
+        SequenceAlignment::Response responseCPU;
+        SequenceAlignment::Response responseGPU;
+        parseArguments(argc, argv, &request);
+
+        SequenceAlignment::alignSequenceCPU(request, &responseCPU);
+        SequenceAlignment::alignSequenceGPU(request, &responseGPU);
+
+        REQUIRE(responseGPU.score == responseCPU.score);
+        REQUIRE(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
+                std::string(responseGPU.alignedTextBytes, (responseGPU.alignedTextBytes + responseGPU.numAlignmentBytes)));
+        REQUIRE(std::string(responseCPU.alignedPatternBytes, (responseCPU.alignedPatternBytes + responseCPU.numAlignmentBytes)) ==
+                std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
+        REQUIRE(responseCPU.startInAlignedText == responseGPU.startInAlignedText);
+        REQUIRE(responseCPU.startInAlignedPattern == responseGPU.startInAlignedPattern);
+    }
+}
