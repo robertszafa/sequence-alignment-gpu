@@ -50,6 +50,7 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
         // std::make_pair(200000, 220000),
     };
 
+    std::cout << "\nGlobal alignment benchmark:\n";
     for (const auto &sizePair : benchmarkSizes)
     {
         uint64_t numRows = sizePair.first;
@@ -103,10 +104,67 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
 }
 
 
+void benchmarkFillMatrixSW(bool cpu, bool gpu)
+{
+    std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizes =
+    {
+        std::make_pair(80, 1024),
+        std::make_pair(400, 1024*4),
+        std::make_pair(1900, 1024*8),
+        std::make_pair(3200, 1024*16),
+    };
+
+    std::cout << "\nLocal alignment benchmark:\n";
+
+    for (const auto &sizePair : benchmarkSizes)
+    {
+        uint64_t numRows = sizePair.first;
+        uint64_t numCols = sizePair.second;
+        std::cout << "-----  " << numRows << " x " << numCols << "  -----\n";
+
+        SequenceAlignment::Request request;
+        SequenceAlignment::Response response;
+        fillDummyRequest(request, numRows, numCols);
+        request.alignmentType = SequenceAlignment::programArgs::LOCAL;
+        char *M = new char[numRows * numCols];
+
+        int totalTimeCPU = 0;
+        if (cpu)
+        {
+            for (int i=0; i<NUM_WARMUPS; ++i)
+                fillMatrixSW(M, numRows, numCols, request);
+            for (int i=0; i<NUM_REPEATS; ++i)
+            {
+                auto begin = std::chrono::steady_clock::now();
+                fillMatrixSW(M, numRows, numCols, request);
+                auto end = std::chrono::steady_clock::now();
+                totalTimeCPU += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+            }
+            std::cout << "CPU = " << (totalTimeCPU/NUM_REPEATS) << " ms\n";
+        }
+
+        int totalTimeGPU = 0;
+        if (gpu)
+        {
+            for (int i=0; i<NUM_WARMUPS; ++i)
+                SequenceAlignment::alignSequenceGPU(request, &response);
+            for (int i=0; i<NUM_REPEATS; ++i)
+                totalTimeGPU += SequenceAlignment::alignSequenceGPU(request, &response);
+            std::cout << "GPU = " << (totalTimeGPU/NUM_REPEATS) << " ms\n";
+        }
+
+        std::cout << "GPU Speedup = " << (double(totalTimeCPU)/double(totalTimeGPU)) << "\n";
+
+        delete [] M;
+    }
+}
+
 
 int main(int argc, const char *argv[])
 {
     benchmarkFillMatrixNW(true, true, false);
+
+    benchmarkFillMatrixSW(true, true);
 
     return 0;
 }
