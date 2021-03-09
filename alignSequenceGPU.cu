@@ -2,7 +2,8 @@
 
 #include "SequenceAlignment.hpp"
 
-constexpr uint64_t MAX_THREADS_PER_BLOCK = 1024;
+#define MAX_THREADS_PER_BLOCK 1024
+#define MAX_CONCURRENT_KERNELS 32
 
 using SequenceAlignment::DIR;
 
@@ -448,7 +449,7 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
     // a column for all its rows, then stream{i+1} can start filling out that column for its rows.
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
-    const int numCuStreams = deviceProp.multiProcessorCount;
+    const int numCuStreams = std::min(MAX_CONCURRENT_KERNELS, deviceProp.multiProcessorCount);
 
     std::vector<cudaStream_t> cuStreams(numCuStreams);
     for (int i=0; i<numCuStreams; ++i)
