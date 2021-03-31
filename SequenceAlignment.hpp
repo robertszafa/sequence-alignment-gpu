@@ -27,7 +27,6 @@ namespace SequenceAlignment
         { "--protein", programArgs::PROTEIN}, { "-p", programArgs::PROTEIN},
         { "--global", programArgs::GLOBAL},
         { "--local", programArgs::LOCAL},
-        { "--semi-global", programArgs::SEMI_GLOBAL},
         { "--score-matrix", programArgs::SCORE_MATRIX}, { "-s", programArgs::SCORE_MATRIX},
         { "--gap-penalty", programArgs::GAP_PENALTY},
     };
@@ -40,7 +39,6 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
        -c, --cpu             - use cpu device (default)\n\
        -g, --gpu             - use gpu device\n\
        --global              - use global alignment (default)\n\
-       --semi-global         - use semi global alignment\n\
        --local               - use local alignment\n\
        -s, --score-matrix    - next argument is a score matrix file\n\
        --gap-penalty         - next argument is a gap open penalty (default 5)\n";
