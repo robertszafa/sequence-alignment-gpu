@@ -11,7 +11,7 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
                                              const int gapPenalty, const int numRows, const int numCols,
                                              char *M, int *finalScore)
 {
-    using SequenceAlignment::DIR;
+    using SequenceAlignment::DIRECTION;
 
     extern __shared__ int _shared[];
     int *_thisScores = _shared;
@@ -23,7 +23,7 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
     const char textByte = (tid > 0) ? textBytes[tid - 1] : alphabetSize;
     // Init first row.
     _thisScores[tid] = tid * -gapPenalty;
-    M[tid] = DIR::LEFT;
+    M[tid] = DIRECTION::LEFT;
 
     __syncthreads();
 
@@ -39,7 +39,7 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
         if (tid == 0)
         {
             _thisScores[tid] = -(i_pattern * gapPenalty);
-            thisRowM[0] = DIR::TOP;
+            thisRowM[0] = DIRECTION::TOP;
             continue;
         }
 
@@ -52,7 +52,7 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
 
         const bool isDiagGreaterThanTop = (fromDiagScore > fromTopScore);
         const int maxFromPrev = isDiagGreaterThanTop ? fromDiagScore : fromTopScore;
-        const auto tmpDir = isDiagGreaterThanTop ? DIR::DIAG : DIR::TOP;
+        const auto tmpDir = isDiagGreaterThanTop ? DIRECTION::DIAG : DIRECTION::TOP;
 
         for (int i_text = 1; i_text < numCols; ++i_text)
         {
@@ -63,7 +63,7 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
                 const bool isPrevGreater = (maxFromPrev > fromLeftScore);
 
                 _thisScores[tid] = isPrevGreater ? maxFromPrev : fromLeftScore;
-                thisRowM[i_text] = isPrevGreater ? tmpDir : DIR::LEFT;
+                thisRowM[i_text] = isPrevGreater ? tmpDir : DIRECTION::LEFT;
             }
             __syncthreads();
         }

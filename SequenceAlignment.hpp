@@ -121,7 +121,7 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
         }
     };
 
-    enum DIR { LEFT, DIAG, TOP, STOP};
+    enum DIRECTION { LEFT, DIAG, TOP, STOP};
 
 
     int alignSequenceCPU(const Request&, Response*);

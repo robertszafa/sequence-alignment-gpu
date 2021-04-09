@@ -5,7 +5,7 @@
 #define MAX_THREADS_PER_BLOCK 1024
 #define MAX_CONCURRENT_KERNELS 32
 
-using SequenceAlignment::DIR;
+using SequenceAlignment::DIRECTION;
 
 struct columnState { int score; int kernelId; };
 
@@ -38,7 +38,7 @@ __device__ __forceinline__ void ping_pong_buffers(int *&first, int *&second, int
 
 /// Given scores of North, West and North-West neigbours,
 /// return the best score and direction.
-__device__ __forceinline__ std::pair<int, DIR> choose_direction_NW(const int leftScore,
+__device__ __forceinline__ std::pair<int, DIRECTION> choose_direction_NW(const int leftScore,
                                                                    const int topScore,
                                                                    const int diagScore,
                                                                    const int gapPenalty,
@@ -51,8 +51,8 @@ __device__ __forceinline__ std::pair<int, DIR> choose_direction_NW(const int lef
     const int maxWithGap = max(fromLeftScore, fromTopScore);
     const int bestScore = max(maxWithGap, fromDiagScore);
 
-    const auto dirWithGap = (fromTopScore > fromLeftScore) ? DIR::TOP : DIR::LEFT;
-    const auto bestDir = (fromDiagScore > maxWithGap) ? DIR::DIAG : dirWithGap;
+    const auto dirWithGap = (fromTopScore > fromLeftScore) ? DIRECTION::TOP : DIRECTION::LEFT;
+    const auto bestDir = (fromDiagScore > maxWithGap) ? DIRECTION::DIAG : dirWithGap;
 
     return {bestScore, bestDir};
 }
@@ -85,7 +85,7 @@ __global__ void cuda_fillMatrixNW(const char* __restrict__ textBytes,
 
     // Each thread gets one row (one pattern letter).
     const char patternByte = patternBytes[max(0, (tid + startRow) - 1)];
-    M[tid * numCols] = DIR::TOP;
+    M[tid * numCols] = DIRECTION::TOP;
 
     /* First half of matrix filling */
     int diagonalSize = 0;
@@ -162,8 +162,8 @@ __global__ void cuda_fillMatrixNW(const char* __restrict__ textBytes,
 }
 
 /// Given scores of North, West and North-West neigbours,
-/// return the best score and direction. If the best score is 0, then return DIR::STOP.
-__device__ __forceinline__ std::pair<int, DIR> choose_direction_SW(const int leftScore,
+/// return the best score and direction. If the best score is 0, then return DIRECTION::STOP.
+__device__ __forceinline__ std::pair<int, DIRECTION> choose_direction_SW(const int leftScore,
                                                                    const int topScore,
                                                                    const int diagScore,
                                                                    const int gapPenalty,
@@ -176,9 +176,9 @@ __device__ __forceinline__ std::pair<int, DIR> choose_direction_SW(const int lef
     const int maxWithGap = max(fromLeftScore, fromTopScore);
     const int bestScore = max(max(maxWithGap, fromDiagScore), 0);
 
-    const auto dirWithGap = (fromTopScore > fromLeftScore) ? DIR::TOP : DIR::LEFT;
-    const auto bestDirNonZero = (fromDiagScore > maxWithGap) ? DIR::DIAG : dirWithGap;
-    const auto bestDir = bestScore > 0 ? bestDirNonZero : DIR::STOP;
+    const auto dirWithGap = (fromTopScore > fromLeftScore) ? DIRECTION::TOP : DIRECTION::LEFT;
+    const auto bestDirNonZero = (fromDiagScore > maxWithGap) ? DIRECTION::DIAG : dirWithGap;
+    const auto bestDir = bestScore > 0 ? bestDirNonZero : DIRECTION::STOP;
 
     return {bestScore, bestDir};
 }
@@ -245,7 +245,7 @@ __global__ void cuda_fillMatrixSW(const char* __restrict__ textBytes,
 
     // Each thread gets one row (one pattern letter).
     const char patternByte = patternBytes[max(0, (tid + startRow) - 1)];
-    M[tid * numCols] = DIR::STOP;
+    M[tid * numCols] = DIRECTION::STOP;
 
     /* First half of matrix filling */
     int diagonalSize = 0;
@@ -407,7 +407,7 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
     // The init value will be different for global and local alignments.
     if (request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
     {
-        std::fill_n(os_M, numCols, DIR::LEFT);
+        std::fill_n(os_M, numCols, DIRECTION::LEFT);
         std::vector<columnState> initState(numCols);
         for (int i=0; i<numCols; ++i)
         {
@@ -419,7 +419,7 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
     }
     else if (request.alignmentType == SequenceAlignment::programArgs::LOCAL)
     {
-        std::fill_n(os_M, numCols, DIR::STOP);
+        std::fill_n(os_M, numCols, DIRECTION::STOP);
         cudaMemsetAsync(d_columnState, 0, sizeof(columnState) * numCols, cuStream);
     }
 

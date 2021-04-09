@@ -4,7 +4,7 @@
 #include <iterator>
 
 
-using SequenceAlignment::DIR;
+using SequenceAlignment::DIRECTION;
 
 
 void SequenceAlignment::traceBackSW(const char *M, const uint64_t start, const uint64_t numRows,
@@ -16,11 +16,11 @@ void SequenceAlignment::traceBackSW(const char *M, const uint64_t start, const u
     response->numAlignmentBytes = 0;
 
     auto curr = start;
-    while (M[curr] != DIR::STOP)
+    while (M[curr] != DIRECTION::STOP)
     {
         // Was it a match, gap in text or gap in pattern?
-        const bool takeText = (M[curr] == DIR::DIAG || M[curr] == DIR::LEFT);
-        const bool takePattern = (M[curr] == DIR::DIAG || M[curr] == DIR::TOP);
+        const bool takeText = (M[curr] == DIRECTION::DIAG || M[curr] == DIRECTION::LEFT);
+        const bool takePattern = (M[curr] == DIRECTION::DIAG || M[curr] == DIRECTION::TOP);
 
         // Translate from alphabet indexes to alphabet letters.
         const char translatedText = request.alphabet[request.textBytes[textIndex]];
@@ -35,12 +35,12 @@ void SequenceAlignment::traceBackSW(const char *M, const uint64_t start, const u
         response->numAlignmentBytes += 1;
 
         // Go to next cell.
-        curr -= (M[curr] == DIR::LEFT) +
-                ((M[curr] == DIR::DIAG) * (numCols+1)) +
-                ((M[curr] == DIR::TOP) * (numCols));
+        curr -= (M[curr] == DIRECTION::LEFT) +
+                ((M[curr] == DIRECTION::DIAG) * (numCols+1)) +
+                ((M[curr] == DIRECTION::TOP) * (numCols));
 
         // Update text and pattern indices depending which one was used.
-        if (M[curr] != DIR::STOP)
+        if (M[curr] != DIRECTION::STOP)
         {
             textIndex = std::max(0, textIndex - takeText);
             patternIndex = std::max(0, patternIndex - takePattern);
@@ -67,8 +67,8 @@ void SequenceAlignment::traceBackNW(const char *M, const uint64_t numRows, const
     while (curr > 0)
     {
         // Was it a match, gap in text or gap in pattern?
-        const bool takeText = (M[curr] == DIR::DIAG || M[curr] == DIR::LEFT);
-        const bool takePattern = (M[curr] == DIR::DIAG || M[curr] == DIR::TOP);
+        const bool takeText = (M[curr] == DIRECTION::DIAG || M[curr] == DIRECTION::LEFT);
+        const bool takePattern = (M[curr] == DIRECTION::DIAG || M[curr] == DIRECTION::TOP);
 
         // Translate from alphabet indexes to alphabet letters.
         const char translatedText = request.alphabet[request.textBytes[textIndex]];
@@ -86,9 +86,9 @@ void SequenceAlignment::traceBackNW(const char *M, const uint64_t numRows, const
         textIndex = std::max(0, textIndex - takeText);
         patternIndex = std::max(0, patternIndex - takePattern);
         // Go to next cell.
-        curr -= (M[curr] == DIR::LEFT) +
-                ((M[curr] == DIR::DIAG) * (numCols+1)) +
-                ((M[curr] == DIR::TOP) * (numCols));
+        curr -= (M[curr] == DIRECTION::LEFT) +
+                ((M[curr] == DIRECTION::DIAG) * (numCols+1)) +
+                ((M[curr] == DIRECTION::TOP) * (numCols));
     }
 
     response->startInAlignedText = textIndex;
@@ -131,7 +131,7 @@ std::pair<int, uint64_t> fillMatrixSW(char *M, const uint64_t numRows, const uin
     for (uint64_t i_text = 0; i_text < numCols; ++i_text)
     {
         thisRowScores[i_text] = 0;
-        M[i_text] = DIR::STOP;
+        M[i_text] = DIRECTION::STOP;
     }
 
     // Dynamic programming loop
@@ -147,7 +147,7 @@ std::pair<int, uint64_t> fillMatrixSW(char *M, const uint64_t numRows, const uin
 
         // Init first column with 0.
         thisRowScores[0] = 0;
-        thisRowM[0] = DIR::STOP;
+        thisRowM[0] = DIRECTION::STOP;
 
         for (uint64_t i_text = 1; i_text < numCols; ++i_text)
         {
@@ -171,8 +171,8 @@ std::pair<int, uint64_t> fillMatrixSW(char *M, const uint64_t numRows, const uin
             const bool isFromTop = (fromDiagonalScore <= maxWithGap) && (fromLeftScore < fromTopScore);
 
             // Populate this alignPoint with the best alignment.
-            const auto dirNonZeroScore = isFromLeft * DIR::LEFT + isFromDiag * DIR::DIAG + isFromTop * DIR::TOP;
-            thisRowM[i_text] = bestScore > 0 ? dirNonZeroScore : DIR::STOP;
+            const auto dirNonZeroScore = isFromLeft * DIRECTION::LEFT + isFromDiag * DIRECTION::DIAG + isFromTop * DIRECTION::TOP;
+            thisRowM[i_text] = bestScore > 0 ? dirNonZeroScore : DIRECTION::STOP;
             thisRowScores[i_text] = std::max(0, bestScore);
             maxIJ = thisRowScores[i_text] > maxScore ? (i_pattern * numCols + i_text) : maxIJ;
             maxScore = std::max(maxScore, thisRowScores[i_text]);
@@ -218,7 +218,7 @@ int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
     for (uint64_t i_text = 0; i_text < numCols; ++i_text)
     {
         thisRowScores[i_text] = i_text * -request.gapPenalty;
-        M[i_text] = DIR::LEFT;
+        M[i_text] = DIRECTION::LEFT;
     }
 
     // Dynamic programming loop
@@ -231,7 +231,7 @@ int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
         thisRowScores = tmp;
 
         thisRowScores[0] = i_pattern * -request.gapPenalty;
-        thisRowM[0] = DIR::TOP;
+        thisRowM[0] = DIRECTION::TOP;
 
         for (uint64_t i_text = 1; i_text < numCols; ++i_text)
         {
@@ -256,7 +256,7 @@ int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
 
             // Populate this alignPoint with the best alignment.
             thisRowScores[i_text] = bestScore;
-            thisRowM[i_text] = (isFromLeft * DIR::LEFT + isFromDiag * DIR::DIAG + isFromTop * DIR::TOP);
+            thisRowM[i_text] = (isFromLeft * DIRECTION::LEFT + isFromDiag * DIRECTION::DIAG + isFromTop * DIRECTION::TOP);
         }
 
         thisRowM += numCols;
