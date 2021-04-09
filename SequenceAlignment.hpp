@@ -44,8 +44,6 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
        --gap-penalty         - next argument is a gap open penalty (default 5)\n";
     const std::string SEQ_NOT_READ_ERROR = "error: text sequence or pattern sequence not read\n";
     const std::string MEM_ERROR = "error: sequence is too long, not enough memory\n";
-    const std::string TEXT_SHORTER_THAN_PATTERN_ERROR =
-        "error: text sequence cannot be shorter than the pattern sequence.\n";
     const std::string SCORE_MATRIX_NOT_READ_ERROR =
         "error: matrix scores not read. Only integer scores accepted (int)\n";
     const std::string GAP_PENALTY_NOT_READ_ERROR =

@@ -212,10 +212,10 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
     }
     else if (request->textNumBytes < request->patternNumBytes)
     {
-        std::cerr << SequenceAlignment::TEXT_SHORTER_THAN_PATTERN_ERROR;
-        return -1;
+        // Text is expected to be longer.
+        std::swap(request->textBytes, request->patternBytes);
+        std::swap(request->textNumBytes, request->patternNumBytes);
     }
-
 
     if (scoreMatrixState != flagState::READ)
     {
