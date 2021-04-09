@@ -193,8 +193,8 @@ __device__ __forceinline__ std::pair<int, int> max_reduce(const int threadBestSc
 
     if (tid == 0)
     {
-        s_bestScore = 0;
-        s_bestScoreIdx = 0;
+        s_bestScore = threadBestScore;
+        s_bestScoreIdx = threadBestScoreIdx;
     }
 
     // Do all warps.
