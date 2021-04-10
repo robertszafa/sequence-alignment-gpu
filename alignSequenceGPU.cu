@@ -19,12 +19,15 @@ __device__ __forceinline__ void set_done(columnState* volatile colState, const u
 
 /// Given a column and a kernelId, spin while the kernelId of that column
 /// is not equal to the supplied kernelId.
-__device__ __forceinline__ void busy_wait(columnState* volatile colState, const unsigned int col,
-                                          const int kernelId)
+/// Once finished waiting, return the score of the columnState.
+__device__ __forceinline__ int get_prev_score(columnState* volatile colState, const unsigned int col,
+                                              const int kernelId)
 {
     volatile int currKernelId = colState[col].kernelId;
     while (currKernelId != kernelId)
         currKernelId = colState[col].kernelId;
+
+    return colState[col].score;
 }
 
 /// Swap 3 pointers: third will point to old_second, second to old_first, first to old_third.
@@ -83,15 +86,13 @@ __global__ void cuda_fillMatrixNW(const char* __restrict__ textBytes,
             _scoreMatrix[offset + tid] = scoreMatrix[offset + tid];
     }
 
-    // Each thread gets one row (one pattern letter).
-    const char patternByte = patternBytes[max(0, (tid + startRow) - 1)];
+    // Each thread gets one row - one pattern letter (note that startRow >= 1).
+    const char patternByte = patternBytes[tid + startRow - 1];
     M[tid * numCols] = DIRECTION::TOP;
 
     /* First half of matrix filling */
     int diagonalSize = 0;
-    int fromLeft, fromDiag;
-    // The fromDiagonal score at iteration_i, becomes the fromTop score at itreation_i+1.
-    int fromTop = (tid + startRow-1) * gapPenalty;
+    int fromLeft = 0, fromDiag = 0, fromTop = 0, fromPrevKernel = 0;
     for (int i_text = 1; i_text < numCols; ++i_text)
     {
         ping_pong_buffers(_thisScores, _prevScores, _prevPrevScores);
@@ -99,9 +100,11 @@ __global__ void cuda_fillMatrixNW(const char* __restrict__ textBytes,
         diagonalSize = min(diagonalSize + 1, numRows);
         const int idxInRow = i_text - tid;
 
-        // Need to wait for previous chunk to finish with this column.
-        if (tid == 0)
-            busy_wait(colState, i_text, kernelId);
+        // Need to wait for previous kernel to finish with this column.
+        if (tid == 0 && kernelId > 0)
+            fromPrevKernel = get_prev_score(colState, i_text, kernelId);
+        else if (tid == 0)
+            fromPrevKernel = i_text * -gapPenalty;
 
         // Join previous iteration's threads and thread 0.
         __syncthreads();
@@ -109,11 +112,11 @@ __global__ void cuda_fillMatrixNW(const char* __restrict__ textBytes,
         if (tid < diagonalSize)
         {
             fromLeft = (idxInRow == 1)                  // Am I in the first column to the left?
-                       ? (tid + startRow) * gapPenalty  // If yes, then column to left is the empty char.
+                       ? (tid + startRow) * -gapPenalty // If yes, then column to left is the empty char.
                        : _prevScores[tid];              // Otherwise, I'm somewhere in the middle.
             fromDiag = fromTop;
             fromTop = (tid == 0)                        // Am I the first row?
-                      ? colState[i_text].score          // If yes, then need to get score from previous chunk.
+                      ? fromPrevKernel                  // If yes, then need to get score from previous kernel.
                       : _prevScores[tid - 1];           // Otherwise, I'm somewhere in the middle.
 
             const char textByte = textBytes[idxInRow - 1];
@@ -121,7 +124,7 @@ __global__ void cuda_fillMatrixNW(const char* __restrict__ textBytes,
 
             // Choose best direction, save score to shared and direction to global memory.
             auto scoreDirPair = choose_direction_NW(fromLeft, fromTop, fromDiag, gapPenalty,
-                                                _scoreMatrix[scoreMatrixIdx]);
+                                                    _scoreMatrix[scoreMatrixIdx]);
             _thisScores[tid] = scoreDirPair.first;
             M[tid*numCols + idxInRow] = scoreDirPair.second;
 
@@ -148,7 +151,7 @@ __global__ void cuda_fillMatrixNW(const char* __restrict__ textBytes,
 
             // Choose best direction, save score to shared and direction to global memory.
             auto scoreDirPair = choose_direction_NW(_prevScores[tid], _prevScores[tid - 1], _prevPrevScores[tid - 1],
-                                                gapPenalty, _scoreMatrix[scoreMatrixIdx]);
+                                                    gapPenalty, _scoreMatrix[scoreMatrixIdx]);
             _thisScores[tid] = scoreDirPair.first;
             M[tid*numCols + idxInRow] = scoreDirPair.second;
 
@@ -183,35 +186,25 @@ __device__ __forceinline__ std::pair<int, DIRECTION> choose_direction_SW(const i
     return {bestScore, bestDir};
 }
 
-__device__ __forceinline__ std::pair<int, int> max_reduce(const int threadBestScore,
-                                                          const int threadBestScoreIdx)
+__device__ __forceinline__ std::pair<int, int> max_reduce(const int threadScore,
+                                                          const int threadScoreIdx)
 {
     int tid = threadIdx.x;
 
-    __shared__ volatile int s_bestScore;
-    __shared__ volatile int s_bestScoreIdx;
+    __shared__ int s_bestScore;
+    __shared__ int s_bestScoreIdx;
 
     if (tid == 0)
     {
-        s_bestScore = threadBestScore;
-        s_bestScoreIdx = threadBestScoreIdx;
+        s_bestScore = threadScore;
+        s_bestScoreIdx = threadScoreIdx;
     }
+    __syncthreads();
 
-    // Do all warps.
-    for (int i_warp = 0; i_warp < MAX_THREADS_PER_BLOCK; i_warp += 32)
-    {
-        int i = i_warp + tid;
-        if (i >= blockDim.x) break;
-
-        // Reduce max inside warp. This while loop is guaranteed to terminate.
-        while (s_bestScore < threadBestScore)
-        {
-            s_bestScore = threadBestScore;
-            s_bestScoreIdx = threadBestScoreIdx;
-        }
-
-        __syncthreads();
-    }
+    // TODO: Classic tree reduction, taking memory access patterns into account.
+    if (atomicMax(&s_bestScore, threadScore) < threadScore)
+        s_bestScoreIdx = threadScoreIdx;
+    __syncthreads();
 
     return {s_bestScore, s_bestScoreIdx};
 }
@@ -243,15 +236,14 @@ __global__ void cuda_fillMatrixSW(const char* __restrict__ textBytes,
             _scoreMatrix[offset + tid] = scoreMatrix[offset + tid];
     }
 
-    // Each thread gets one row (one pattern letter).
-    const char patternByte = patternBytes[max(0, (tid + startRow) - 1)];
+    // Each thread gets one row - one pattern letter (note that startRow >= 1).
+    const char patternByte = patternBytes[tid + startRow - 1];
     M[tid * numCols] = DIRECTION::STOP;
 
     /* First half of matrix filling */
     int diagonalSize = 0;
-    int fromLeft = 0, fromDiag = 0, fromTop = 0;
-    int thisBestScore = 0;
-    int thisBestScoreIdx = startRow * numCols;
+    int fromLeft = 0, fromDiag = 0, fromTop = 0, fromPrevKernel = 0;
+    int thisBestScore = 0, thisBestScoreIdx = 0;
     // The fromDiagonal score at iteration_i, becomes the fromTop score at itreation_i+1.
     for (int i_text = 1; i_text < numCols; ++i_text)
     {
@@ -260,9 +252,11 @@ __global__ void cuda_fillMatrixSW(const char* __restrict__ textBytes,
         diagonalSize = min(diagonalSize + 1, numRows);
         const int idxInRow = i_text - tid;
 
-        // Need to wait for previous chunk to finish with this column.
-        if (tid == 0)
-            busy_wait(colState, i_text, kernelId);
+        // Need to wait for previous kernel to finish with this column.
+        if (tid == 0 && kernelId > 0)
+            fromPrevKernel = get_prev_score(colState, i_text, kernelId);
+        else if (tid == 0)
+            fromPrevKernel = 0;
 
         // Join previous iteration's threads and thread 0.
         __syncthreads();
@@ -274,7 +268,7 @@ __global__ void cuda_fillMatrixSW(const char* __restrict__ textBytes,
                        : _prevScores[tid];              // Otherwise, I'm somewhere in the middle.
             fromDiag = fromTop;
             fromTop = (tid == 0)                        // Am I the first row?
-                      ? colState[i_text].score          // If yes, then need to get score from previous chunk.
+                      ? fromPrevKernel                  // If yes, then need to get score from previous chunk.
                       : _prevScores[tid - 1];           // Otherwise, I'm somewhere in the middle.
 
             const char textByte = textBytes[idxInRow - 1];
@@ -367,8 +361,8 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
         return sizeof(int) * request.alphabetSize * request.alphabetSize +  // scoreMatrix
                request.textNumBytes + request.patternNumBytes +             // sequences
                sizeof(columnState) * numCols +                              // columState
-               numCuStreams * numThreads * numCols +                          // device M per stream
-               sizeof(int) * numCuStreams * 2;                                // bestScore + bestScoreIdx per stream
+               numCuStreams * numThreads * numCols +                        // device M per stream
+               sizeof(int) * numCuStreams * 2;                              // bestScore + bestScoreIdx per stream
     };
     uint64_t numThreads = MAX_THREADS_PER_BLOCK;
     uint64_t freeGlobalMem = 0;
@@ -403,25 +397,15 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
         }
     }
 
-    // Initialize the very first row scores and directions of M. Also, initialize columnState.
+    // Initialize the first row directions of M.
     // The init value will be different for global and local alignments.
     if (request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
-    {
         std::fill_n(os_M, numCols, DIRECTION::LEFT);
-        std::vector<columnState> initState(numCols);
-        for (int i=0; i<numCols; ++i)
-        {
-            initState[i].score = i * -request.gapPenalty;
-            initState[i].kernelId = 0;
-        }
-        if (cudaMemcpyAsync(d_columnState, &(initState[0]), sizeof(columnState) * numCols, cudaMemcpyHostToDevice, cuStream) != cudaSuccess)
-            return 0;
-    }
     else if (request.alignmentType == SequenceAlignment::programArgs::LOCAL)
-    {
         std::fill_n(os_M, numCols, DIRECTION::STOP);
-        cudaMemsetAsync(d_columnState, 0, sizeof(columnState) * numCols, cuStream);
-    }
+
+    // Zero columnState.
+    cudaMemsetAsync(d_columnState, 0, sizeof(columnState) * numCols, cuStream);
 
     if (cudaMemcpyAsync(d_textBytes, request.textBytes, request.textNumBytes, cudaMemcpyHostToDevice, cuStream) != cudaSuccess ||
         cudaMemcpyAsync(d_patternBytes, request.patternBytes, request.patternNumBytes, cudaMemcpyHostToDevice, cuStream) != cudaSuccess ||
@@ -525,7 +509,7 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
         auto begin = std::chrono::steady_clock::now();
     #endif
 
-    // First row is already inititalized, start from second.
+    // First row follows from inititalisation, start from second.
     int startRow = 1;
     auto curr_os_M = os_M + numCols;
     int maxScore = 0, maxScoreIdx = 0;
