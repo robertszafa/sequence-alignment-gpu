@@ -1,3 +1,16 @@
+>Organism: Absiella sp. AM22-9
+>Assembly type: n/a
+>Assembly level: Scaffold
+>Assembly method: SOAPdenovo v. 2
+>Genome representation: full
+>GenBank assembly accession: GCA_003433695.1 (latest)
+>RefSeq assembly accession: GCF_003433695.1 (latest)
+>RefSeq assembly and GenBank assembly identical: yes
+>WGS Project: QVFG01
+>Genome coverage: 100x
+>Sequencing technology: Illumina Hiseq
+>Release date: 2018-8-31
+
 ATAGTAAATAAAGAATAGAAACAAAGAAAAAAAGAATATACATGAGAATGAAACATGAATCGTATTCAAATGAAAAGTGT
 CAAATGAATTCTGTTTATAAATGAATAACATAAATGAAGTCCTCCTTTGTGTGCATTCACTTATAAACAAAGCCGCGTAA
 GCGGCCAAATTTTGATTCTTTTGTCAATAGTGAAAAATAAAAAGTGGTACCTAGTGGGAAATTCACTAGATATCACTTTT

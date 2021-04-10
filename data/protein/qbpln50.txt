@@ -1,3 +1,56 @@
+>GBPLN50.SEQ         Genetic Sequence Data Bank
+>                        February 15 2021
+>
+>                NCBI-GenBank Flat File Release 242.0
+>
+>                         Plant Sequences (Part 50)
+>
+>      74 loci,   124609184 bases, from       74 reported sequences
+>
+>
+>LOCUS       CP027651             1073930 bp    DNA     linear   PLN 21-MAR-2018
+>DEFINITION  Torulaspora delbrueckii strain COFT1 chromosome 5, complete
+>            sequence.
+>ACCESSION   CP027651
+>VERSION     CP027651.1
+>DBLINK      BioProject: PRJNA435462
+>            BioSample: SAMN08580061
+>KEYWORDS    .
+>SOURCE      Torulaspora delbrueckii (Candida colliculosa)
+>  ORGANISM  Torulaspora delbrueckii
+>            Eukaryota; Fungi; Dikarya; Ascomycota; Saccharomycotina;
+>            Saccharomycetes; Saccharomycetales; Saccharomycetaceae;
+>            Torulaspora.
+>REFERENCE   1  (bases 1 to 1073930)
+>  AUTHORS   Jiranek,V. and Grbin,P.
+>  TITLE     Genome sequence of Australian wine indigenous yeast Torulaspora
+>            delbrueckiistrai COFT1 using Nanopore sequencing
+>  JOURNAL   Unpublished
+>REFERENCE   2  (bases 1 to 1073930)
+>  AUTHORS   Tondini,F. and Onetto,C.A.
+>  TITLE     Direct Submission
+>  JOURNAL   Submitted (07-MAR-2018) School of Agriculture, Food and Wine,
+>            University of Adelaide, corner Paratoo road and Hartley grove,
+>            Urrbrae, South Australia 5064, Australia
+>COMMENT     ##Genome-Assembly-Data-START##
+>            Assembly Date          :: 2018
+>            Assembly Method        :: SMARTdenovo v. 1.0
+>            Genome Representation  :: Full
+>            Expected Final Version :: Yes
+>            Genome Coverage        :: 130.0x
+>            Sequencing Technology  :: Nanopore; Illumina HiSeq
+>            ##Genome-Assembly-Data-END##
+>FEATURES             Location/Qualifiers
+>     source          1..1073930
+>                     /organism="Torulaspora delbrueckii"
+>                     /mol_type="genomic DNA"
+>                     /strain="COFT1"
+>                     /isolation_source="spontaneous wine fermentation - shiraz"
+>                     /db_xref="taxon:4950"
+>                     /chromosome="5"
+>                     /country="Australia"
+>                     /lat_lon="34.5035 S 139.0505 E"
+>                     /collection_date="2014"
 aatacctcgagaaacatgccctataactcctctccgaccatcctctaaggcctcggagat
 taacaacactctcgtagatttacgggtcaggcaactaggctcttcagctaagcgtaagct
 atctaggtagctcatttgtacaatacttggctttatgttcgttacaactatgtctgctcc

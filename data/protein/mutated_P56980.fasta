@@ -1,0 +1,7 @@
+>> mutation of data/protein/P56980.fasta by mutate.py
+>> DELETION_CHANCE = 0.05
+>> INSERTION_CHANCE = 0.02
+>> SUBSTITUTION_CHANCE = 0.05
+
+>sp|P56980|REPL1_ECOLI Positive regulator of RepFIC repA1 expression OS=Escherichia coli (strain K12) GN=repL PE=4 SV=1
+MPGKVQDFGLCSLLLIVSAGWCGL
