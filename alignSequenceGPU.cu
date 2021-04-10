@@ -186,27 +186,20 @@ __device__ __forceinline__ std::pair<int, DIRECTION> choose_direction_SW(const i
     return {bestScore, bestDir};
 }
 
-__device__ __forceinline__ std::pair<int, int> max_reduce(const int threadScore,
-                                                          const int threadScoreIdx)
+/// Given an array values, compute the maximum of of the N first items and store it in values[0].
+__device__ __forceinline__ void max_reduce(int *values, const int N)
 {
-    int tid = threadIdx.x;
+    const int tid = threadIdx.x;
 
-    __shared__ int s_bestScore;
-    __shared__ int s_bestScoreIdx;
-
-    if (tid == 0)
+    // Tree reduction with log2 levels.
+    for (int pow2 = 1; pow2 < N; pow2 <<= 1)
     {
-        s_bestScore = threadScore;
-        s_bestScoreIdx = threadScoreIdx;
+        // Only threads at pow2 indexes do work.
+        if ((tid & pow2) == 0 && (tid + pow2) < N)
+            values[tid] = max(values[tid], values[tid + pow2]);
+
+        __syncthreads();
     }
-    __syncthreads();
-
-    // TODO: Classic tree reduction, taking memory access patterns into account.
-    if (atomicMax(&s_bestScore, threadScore) < threadScore)
-        s_bestScoreIdx = threadScoreIdx;
-    __syncthreads();
-
-    return {s_bestScore, s_bestScoreIdx};
 }
 
 __global__ void cuda_fillMatrixSW(const char* __restrict__ textBytes,
@@ -324,13 +317,22 @@ __global__ void cuda_fillMatrixSW(const char* __restrict__ textBytes,
         }
     }
 
-    // Find maximum score (and its index) accross all threads in block.
-    auto bestScoreAndIdxPair = max_reduce(thisBestScore, thisBestScoreIdx);
-    if (tid == 0)
+    // Find the maximum score (and its index) accross all threads in the kernel.
+    // Reuse the thisScores shared memory buffer to put all threads bestScores into consecutive
+    // memory.
+    _thisScores[tid] = thisBestScore;
+    __syncthreads();
+    max_reduce(_thisScores, blockDim.x);
+
+    // Store best score and corresponding index in global memory. There could be multiple threads
+    // with the highest score, but it doesn't matter which one is selected.
+    if (_thisScores[0] == thisBestScore)
     {
-        *p_bestScore = bestScoreAndIdxPair.first;
-        *p_bestScoreIdx = bestScoreAndIdxPair.second;
+        *p_bestScore = thisBestScore;
+        *p_bestScoreIdx = thisBestScoreIdx;
+        return;
     }
+
 }
 
 
