@@ -1,10 +1,18 @@
 import sys
 import random
 
+DELETION_CHANCE = 0.05
+INSERTION_CHANCE = 0.02
+SUBSTITUTION_CHANCE = 0.05
+
 if __name__ == "__main__":
+    fname = str(sys.argv[-1])
     proteinOrDna = str(sys.argv[1])
 
-    fname = str(sys.argv[2])
+    # Default dna.
+    if len(sys.argv) == 1:
+        proteinOrDna = 'dna'
+
     m_fname = fname.split('/')
     m_fname[-1] = "mutated_" + m_fname[-1]
     m_fname = ''.join([text + '/' for text in m_fname])[:-1]
@@ -14,28 +22,36 @@ if __name__ == "__main__":
     PROTEIN_ALPHABET =  ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M', 'F', 'P',
                          'S', 'T', 'W', 'Y', 'V', 'B', 'Z', 'X']
 
-    alphabet = DNA_ALPHABET if 'd' in proteinOrDna else PROTEIN_ALPHABET
+    alphabet = DNA_ALPHABET if 'd' in proteinOrDna or len(sys.argv) == 1 else PROTEIN_ALPHABET
 
-    mutated_seq = ''
+    mutated_seq = '>> mutation of ' + fname + ' by mutate.py\n'
+    mutated_seq += f'>> DELETION_CHANCE = {DELETION_CHANCE}\n'
+    mutated_seq += f'>> INSERTION_CHANCE = {INSERTION_CHANCE}\n'
+    mutated_seq += f'>> SUBSTITUTION_CHANCE = {SUBSTITUTION_CHANCE}\n\n'
 
     num_del = 0
     num_inserts = 0
     num_sub = 0
     with open(fname, 'r') as f:
         for line in f:
+            # FASTA encoded files.
+            if line.lstrip()[0] == '>':
+                mutated_seq += line
+                continue
+
             for c in line:
                 c = c.upper()
 
                 # 5% chance of deletion
-                if random.random() < 0.05:
+                if random.random() < DELETION_CHANCE:
                     num_del += 1
                     pass
                 # 3% chance of insertion
-                elif random.random() < 0.03:
+                elif random.random() < INSERTION_CHANCE:
                     num_inserts += 1
                     mutated_seq += random.choice(alphabet)
                 # 5% chance of substitution
-                elif random.random() < 0.05:
+                elif random.random() < SUBSTITUTION_CHANCE:
                     num_sub += 1
                     alphabet_without_c = [l for l in alphabet if l != c]
                     mutated_seq += random.choice(alphabet_without_c)

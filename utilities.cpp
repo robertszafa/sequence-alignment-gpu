@@ -25,13 +25,25 @@ int getScore(char char1, char char2, const char *alphabet, const int alphabetSiz
 }
 
 /// Given a string of letters:
-///     - remove character, if not in the alphabet
-///     - transorm character into i where character=alphabet[i], if not in the alphabet
+///     - remove character, if not in the alphabet,
+///     - ignore lines staring with '>' (FASTA compatible),
+///     - transorm character into i where character=alphabet[i], if not in the alphabet.
 int validateAndTransform(std::string &sequence, const char *alphabet, const int alphabetSize)
 {
+    enum LINE { READ, IGNORE };
+    auto state = LINE::READ;
+
     unsigned int numRead = 0;
     for (int i=0; i<sequence.length(); ++i)
     {
+        // Deal with FASTA encoded files.
+        if (state == LINE::READ && sequence[i] == '>')
+            state = LINE::IGNORE;
+        else if (state == LINE::IGNORE && sequence[i] == '\n')
+            state = LINE::READ;
+        else if (state == LINE::IGNORE)
+            continue;
+
         const char upperLetter = (sequence[i] > 90) ? sequence[i] - 32 : sequence[i];
         // Ignore characters not on the A-Z range.
         if (upperLetter < 65 || upperLetter > 90) continue;
