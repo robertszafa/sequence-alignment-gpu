@@ -353,34 +353,24 @@ __global__ void cuda_fillMatrixSW(const char* __restrict__ textBytes,
 /// Return 0 if not enough memory to create the minimum sized kernel of 32 x numCols.
 uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment::Response *response,
                     char *&d_textBytes, char *&d_patternBytes, int *&d_scoreMatrix,
-                    columnState *&d_columnState, char *&os_M,
-                    std::vector<char*> &d_M, std::vector<int*> &d_maxScore, std::vector<int*> &d_maxScoreIdx,
-                    std::vector<char*> &h_M, std::vector<int*> &h_maxScore, std::vector<int*> &h_maxScoreIdx,
-                    cudaStream_t &cuStream, const int numCuStreams)
+                    columnState *&d_columnState, std::vector<char*> &d_M,
+                    std::vector<int*> &d_maxScore, std::vector<int*> &d_maxScoreIdx,
+                    char *&h_M, int *&h_maxScores, int *&h_maxScoreIdxs,
+                    cudaEvent_t *&finishedKernelEvents, cudaStream_t &cuStream, const int numComputeStreams)
 {
     const uint64_t numCols = request.textNumBytes + 1;
     const uint64_t numRows = request.patternNumBytes + 1;
 
-    try
-    {
-        os_M = new char[numRows * numCols];
-        response->alignedTextBytes = new char[2 * request.textNumBytes];
-        response->alignedPatternBytes = new char[2 * request.textNumBytes];
-    }
-    catch(const std::bad_alloc& e)
-    {
-        return 0;
-    }
-
-    // Select a number of threads per block such that we fit into global memory.
+    // Calculate number of threads that can be supported with the input size. If <32, then abort.
     auto calcGlobalMem = [&] (int numThreads)
     {
         return sizeof(int) * request.alphabetSize * request.alphabetSize +  // scoreMatrix
                request.textNumBytes + request.patternNumBytes +             // sequences
                sizeof(columnState) * numCols +                              // columState
-               numCuStreams * numThreads * numCols +                        // device M per stream
-               sizeof(int) * numCuStreams * 2;                              // bestScore + bestScoreIdx per stream
+               numComputeStreams * numThreads * numCols +                   // one M per stream
+               sizeof(int) * numComputeStreams * 2;                         // bestScore + bestScoreIdx per stream
     };
+
     uint64_t numThreads = MAX_THREADS_PER_BLOCK;
     uint64_t freeGlobalMem = 0;
     cudaMemGetInfo((size_t*) &freeGlobalMem, 0);
@@ -390,7 +380,47 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
         if (numThreads < 32)
             return 0;
     }
+    // How many GPU kernels will be started?
+    const auto numKernels = numRows/numThreads + 1;
 
+    // Start allocating memory
+
+    /** Host Memory */
+    try
+    {
+        response->alignedTextBytes = new char[2 * request.textNumBytes];
+        response->alignedPatternBytes = new char[2 * request.textNumBytes];
+    }
+    catch(const std::bad_alloc& e)
+    {
+        return 0;
+    }
+
+    // Streams transfer their filled out M matrix portions to pinned memory. This allows the DMA
+    // engine on the GPU to be used, and enables interleaving data transfer and computation.
+    //
+    // The downside is that the OS cannot swap this memory - the size limit of h_M is
+    // the physical memory size, rather the virtual memory size.
+    if (cudaMallocHost(&h_M, numRows * numCols) != cudaSuccess)
+        return 0;
+    // One event per kernel to start DMA transfer.
+    finishedKernelEvents = new cudaEvent_t[numKernels];
+    // For local alignment:
+    if (cudaMallocHost(&(h_maxScores), numKernels * sizeof(int)) != cudaSuccess ||
+        cudaMallocHost(&(h_maxScoreIdxs), numKernels * sizeof(int)) != cudaSuccess)
+    {
+        return 0;
+    }
+
+    // Initialize the first row directions of M (different for global and local alignments).
+    if (request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
+        std::fill_n(h_M, numCols, DIRECTION::LEFT);
+    else if (request.alignmentType == SequenceAlignment::programArgs::LOCAL)
+        std::fill_n(h_M, numCols, DIRECTION::STOP);
+    /** End Host Memory */
+
+
+    /** Device Memory */
     // Shared by all streams.
     if (cudaMalloc(&d_scoreMatrix, sizeof(int) * request.alphabetSize * request.alphabetSize) != cudaSuccess ||
         cudaMalloc(&d_textBytes, request.textNumBytes) != cudaSuccess ||
@@ -401,25 +431,15 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
     }
 
     // One per stream.
-    for (int i=0; i<numCuStreams; ++i)
+    for (int i=0; i<numComputeStreams; ++i)
     {
         if (cudaMalloc(&(d_M[i]), numThreads * numCols) != cudaSuccess ||
             cudaMalloc(&(d_maxScore[i]), sizeof(int)) != cudaSuccess ||
-            cudaMalloc(&(d_maxScoreIdx[i]), sizeof(int)) != cudaSuccess ||
-            cudaMallocHost(&(h_M[i]), numThreads * numCols) != cudaSuccess ||
-            cudaMallocHost(&(h_maxScore[i]), sizeof(int)) != cudaSuccess ||
-            cudaMallocHost(&(h_maxScoreIdx[i]), sizeof(int)) != cudaSuccess)
+            cudaMalloc(&(d_maxScoreIdx[i]), sizeof(int)) != cudaSuccess)
         {
             return 0;
         }
     }
-
-    // Initialize the first row directions of M.
-    // The init value will be different for global and local alignments.
-    if (request.alignmentType == SequenceAlignment::programArgs::GLOBAL)
-        std::fill_n(os_M, numCols, DIRECTION::LEFT);
-    else if (request.alignmentType == SequenceAlignment::programArgs::LOCAL)
-        std::fill_n(os_M, numCols, DIRECTION::STOP);
 
     // Zero columnState.
     cudaMemsetAsync(d_columnState, 0, sizeof(columnState) * numCols, cuStream);
@@ -430,8 +450,9 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
     {
         return 0;
     }
-
+    // Wait for all mem ops to finish.
     cudaStreamSynchronize(cuStream);
+    /** End Device Memory */
 
     return numThreads;
 }
@@ -450,78 +471,93 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
     // a column for all its rows, then stream{i+1} can start filling out that column for its rows.
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
-    // Ensure range 1 >= numCuStreams <= MAX_CONCURRENT_KERNELS, with the conditions:
+
+    // Ensure range 1 >= numComputeStreams <= MAX_CONCURRENT_KERNELS, with the conditions:
     //      - one stream per 1024 rows,
     //      - no more streams than the number of available SMs.
-    const int numCuStreams = std::min(std::max((int) (numRows + 1) / MAX_THREADS_PER_BLOCK, 1),
-                                      std::min(MAX_CONCURRENT_KERNELS, deviceProp.multiProcessorCount));
+    const int numComputeStreams = std::min(std::max((int) (numRows + 1) / MAX_THREADS_PER_BLOCK, 1),
+                                           std::min(MAX_CONCURRENT_KERNELS, deviceProp.multiProcessorCount));
+    // Will hold the number of kernel invocations required for the input sequences.
+    int numKernels = 0;
+    std::vector<cudaStream_t> computeStreams(numComputeStreams);
+    cudaStream_t memoryStream;
 
-    std::vector<cudaStream_t> cuStreams(numCuStreams);
-    for (int i=0; i<numCuStreams; ++i)
-        cudaStreamCreate(&(cuStreams[i]));
+    cudaStreamCreate(&(memoryStream));
+    for (int i=0; i<numComputeStreams; ++i)
+        cudaStreamCreate(&(computeStreams[i]));
+
     // Used to identify current stream for CUDA operations. Start with stream0.
-    cudaStream_t currStream = cuStreams[0];
+    cudaStream_t currComputeStream = computeStreams[0];
+    // Each compute stream will need to notify the memoryStream that it finished with a kernel
+    // and its M matrix is ready to be transfered to host memory. This is done through CUDA events.
+    cudaEvent_t *finishedKernelEvents = nullptr;
 
     /** Memory allocation and transfer. */
-    // OS managed memory (can be swapped to disk).
-    char *os_M = nullptr;
-    // CUDA managed host memory, pinned to physical mem address and not swappable.
-    std::vector<char*> h_M(numCuStreams);
-    std::vector<int*> h_maxScore(numCuStreams);
-    std::vector<int*> h_maxScoreIdx(numCuStreams);
-    // Device memory.
+    // CUDA managed host memory, pinned to physical mem address and not swappable by the OS:
+    char *h_M = nullptr;
+    // Local alignment: each kernel will result in a bestScore and bestIdx instance.
+    int *h_maxScores = nullptr, *h_maxScoreIdxs = nullptr;
+    // Device memory:
+    // Shared by all streams.
     char *d_textBytes = nullptr, *d_patternBytes = nullptr;
     int *d_scoreMatrix = nullptr;
     columnState *d_columnState = nullptr;
-    std::vector<char*> d_M(numCuStreams);
-    std::vector<int*> d_maxScore(numCuStreams);
-    std::vector<int*> d_maxScoreIdx(numCuStreams);
+    // Private to a stream.
+    std::vector<char*> d_M(numComputeStreams);
+    std::vector<int*> d_maxScore(numComputeStreams);
+    std::vector<int*> d_maxScoreIdx(numComputeStreams);
 
-    // Define how the manually allocated resources are destroyed.
+    // Define how the allocated resources are destroyed.
     auto cleanUp = [&]()
     {
-        for (int i=0; i<numCuStreams; ++i)
+        cudaStreamDestroy(memoryStream);
+        for (int i=0; i<numComputeStreams; ++i)
         {
-            cudaStreamDestroy(cuStreams[i]);
+            cudaStreamDestroy(computeStreams[i]);
             if (d_M[i]) cudaFree(d_M[i]);
             if (d_maxScore[i]) cudaFreeHost(d_maxScore[i]);
             if (d_maxScoreIdx[i]) cudaFreeHost(d_maxScoreIdx[i]);
-            if (h_M[i]) cudaFreeHost(h_M[i]);
-            if (h_maxScore[i]) cudaFreeHost(h_maxScore[i]);
-            if (h_maxScoreIdx[i]) cudaFreeHost(h_maxScoreIdx[i]);
             d_M[i] = nullptr;
             d_maxScore[i] = nullptr;
             d_maxScoreIdx[i] = nullptr;
-            h_M[i] = nullptr;
-            h_maxScore[i] = nullptr;
-            h_maxScoreIdx[i] = nullptr;
         }
 
+        for (int i=0; i<numKernels; ++i)
+            cudaEventDestroy(finishedKernelEvents[i]);
+
+        if (finishedKernelEvents) delete [] finishedKernelEvents;
+        if (h_M) cudaFreeHost(h_M);
+        if (h_maxScores) cudaFreeHost(h_maxScores);
+        if (h_maxScoreIdxs) cudaFreeHost(h_maxScoreIdxs);
         if (d_textBytes) cudaFree(d_textBytes);
         if (d_patternBytes) cudaFree(d_patternBytes);
         if (d_scoreMatrix) cudaFree(d_scoreMatrix);
         if (d_columnState) cudaFree(d_columnState);
-        if (os_M) delete [] os_M;
 
+        finishedKernelEvents = nullptr;
+        h_M = nullptr;
+        h_maxScores = nullptr;
+        h_maxScoreIdxs = nullptr;
         d_textBytes = nullptr;
         d_patternBytes = nullptr;
         d_scoreMatrix = nullptr;
         d_columnState = nullptr;
-        os_M = nullptr;
     };
 
     // Deal with memory, and find out the number of possible threads per block, given the input size.
+    // Make the first compute stream deal with memory, to ensure all is ready when it starts
+    // (operations are ordered within streams).
     const uint64_t NUM_THREADS_PER_BLOCK = initMemory(request, response, d_textBytes, d_patternBytes,
-                                                      d_scoreMatrix, d_columnState, os_M,
-                                                      d_M, d_maxScore, d_maxScoreIdx,
-                                                      h_M, h_maxScore, h_maxScoreIdx,
-                                                      currStream, numCuStreams);
+                                                      d_scoreMatrix, d_columnState, d_M, d_maxScore,
+                                                      d_maxScoreIdx, h_M, h_maxScores, h_maxScoreIdxs,
+                                                      finishedKernelEvents, currComputeStream, numComputeStreams);
     if (NUM_THREADS_PER_BLOCK == 0)
     {
         std::cout << MEM_ERROR;
         cleanUp();
         return -1;
     }
+    numKernels = (numRows/NUM_THREADS_PER_BLOCK) + 1;
     /** End Allocate and transfer memory */
 
     // Three score buffers and the score matrix are kept in shared memory.
@@ -532,35 +568,53 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
         auto begin = std::chrono::steady_clock::now();
     #endif
 
-    // First row follows from inititalisation, start from second.
+    // First row and first col follow from inititalisation, start from second.
     int startRow = 1;
-    auto curr_os_M = os_M + numCols;
-    int maxScore = 0, maxScoreIdx = 0;  // For local alignment.
-    for (int i_kernel=0; i_kernel < (numRows/NUM_THREADS_PER_BLOCK + 1); ++i_kernel)
+    auto curr_h_M = h_M + numCols;
+    for (int i_kernel=0; i_kernel < numKernels; ++i_kernel)
     {
         const int numThreads = std::min(NUM_THREADS_PER_BLOCK, numRows - startRow);
         const int endRow = startRow + numThreads - 1;
 
-        // Round-robin scheduling for streams.
-        auto i_stream = i_kernel % numCuStreams;
-        currStream = cuStreams[i_stream];
+        // Round-robin scheduling for compute streams.
+        auto i_stream = i_kernel % (numComputeStreams);
+        currComputeStream = computeStreams[i_stream];
+        cudaEventCreateWithFlags(&finishedKernelEvents[i_kernel], cudaEventDisableTiming);
 
         if (request.alignmentType == programArgs::GLOBAL)
         {
-            cuda_fillMatrixNW<<<1, numThreads, sharedMemSize, currStream>>>
+            cuda_fillMatrixNW<<<1, numThreads, sharedMemSize, currComputeStream>>>
                 (d_textBytes, d_patternBytes, d_scoreMatrix, request.alphabetSize, request.gapPenalty,
                 startRow, endRow, numCols, i_kernel, d_columnState, d_M[i_stream]);
         }
         else if (request.alignmentType == programArgs::LOCAL)
         {
-            cuda_fillMatrixSW<<<1, numThreads, sharedMemSize, currStream>>>
+            cuda_fillMatrixSW<<<1, numThreads, sharedMemSize, currComputeStream>>>
                 (d_textBytes, d_patternBytes, d_scoreMatrix, request.alphabetSize, request.gapPenalty,
                 startRow, endRow, numCols, i_kernel, d_columnState, d_maxScore[i_stream],
                 d_maxScoreIdx[i_stream], d_M[i_stream]);
+        }
 
+        // Record kernel completion.
+        cudaEventRecord(finishedKernelEvents[i_kernel], currComputeStream);
+        // memoryStream waits for kernelCompletion before transferring d_M into h_M
+        cudaStreamWaitEvent(memoryStream, finishedKernelEvents[i_kernel], 0);
+
+        if (cudaMemcpyAsync(curr_h_M, d_M[i_stream], numThreads*numCols, cudaMemcpyDeviceToHost, memoryStream) != cudaSuccess)
+        {
+            std::cout << "error: could not copy from device memory\n";
+            cudaDeviceSynchronize();
+            cleanUp();
+            return -1;
+        }
+        curr_h_M += numThreads*numCols;
+
+        // Local alignment: keep track of maximum score and its index.
+        if (request.alignmentType == programArgs::LOCAL)
+        {
             // Get maxScore and its index from each local alignment kernel.
-            if (cudaMemcpyAsync(h_maxScore[i_stream], d_maxScore[i_stream], sizeof(int), cudaMemcpyDeviceToHost, currStream) != cudaSuccess ||
-                cudaMemcpyAsync(h_maxScoreIdx[i_stream], d_maxScoreIdx[i_stream], sizeof(int), cudaMemcpyDeviceToHost, currStream) != cudaSuccess)
+            if (cudaMemcpyAsync(h_maxScores + i_kernel, d_maxScore[i_stream], sizeof(int), cudaMemcpyDeviceToHost, memoryStream) != cudaSuccess ||
+                cudaMemcpyAsync(h_maxScoreIdxs + i_kernel, d_maxScoreIdx[i_stream], sizeof(int), cudaMemcpyDeviceToHost, memoryStream) != cudaSuccess)
             {
                 std::cout << "error: could not copy from device memory\n";
                 cudaDeviceSynchronize();
@@ -569,31 +623,13 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
             }
         }
 
-        // Get the local M matrix of currStream into the large os_M matrix.
-        // From device memory -> CUDA managed pinned memory -> OS managed swappable memory.
-        if (cudaMemcpyAsync(h_M[i_stream], d_M[i_stream], numThreads*numCols, cudaMemcpyDeviceToHost, currStream) != cudaSuccess)
-        {
-            std::cout << "error: could not copy from device memory\n";
-            cudaDeviceSynchronize();
-            cleanUp();
-            return -1;
-        }
-        cudaStreamSynchronize(currStream);
-        std::copy_n(h_M[i_stream], numThreads*numCols, curr_os_M);
-        curr_os_M += numThreads*numCols;
-
-        // Kepp track of maximum score and its index.
-        if (request.alignmentType == programArgs::LOCAL)
-        {
-            maxScoreIdx = *(h_maxScore[i_stream]) > maxScore ? *(h_maxScoreIdx[i_stream]) : maxScoreIdx;
-            maxScore = std::max(*(h_maxScore[i_stream]), maxScore);
-        }
-
         startRow = endRow + 1;
     }
 
     #ifdef BENCHMARK
-        // If benchmraking, return the time taken instead of error code.
+        // If benchmarking, return the time taken instead of error code.
+        // Measure with data transfer back to the host.
+        cudaStreamSynchronize(memoryStream);
         auto end = std::chrono::steady_clock::now();
         cleanUp();
         return std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
@@ -602,24 +638,26 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
     if (request.alignmentType == programArgs::GLOBAL)
     {
         // At the end, pull out the score from the columnState.
-        if (cudaMemcpyAsync(h_maxScore[0], &(d_columnState[numCols - 1].score), sizeof(int), cudaMemcpyDeviceToHost, currStream) != cudaSuccess)
+        if (cudaMemcpyAsync(h_maxScores, &(d_columnState[numCols - 1].score), sizeof(int), cudaMemcpyDeviceToHost, memoryStream) != cudaSuccess)
         {
             std::cout << "error: could not copy from device memory\n";
             cleanUp();
             return -1;
         }
 
-        cudaStreamSynchronize(currStream);
-        response->score = *(h_maxScore[0]);
-        traceBackNW(os_M, numRows, numCols, request, response);
+        cudaStreamSynchronize(memoryStream);
+        response->score = h_maxScores[0];
+        traceBackNW(h_M, numRows, numCols, request, response);
     }
     else if (request.alignmentType == programArgs::LOCAL)
     {
-        response->score = maxScore;
-        traceBackSW(os_M, maxScoreIdx, numRows, numCols, request, response);
+        // Find the maximum kernel score out of every kernel invocation.
+        cudaStreamSynchronize(memoryStream);
+        auto iMax = std::distance(h_maxScores, std::max_element(h_maxScores, (h_maxScores + numKernels)));
+        response->score = h_maxScores[iMax];
+        traceBackSW(h_M, h_maxScoreIdxs[iMax], numRows, numCols, request, response);
     }
 
     cleanUp();
-
     return 0;
 }
