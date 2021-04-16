@@ -459,6 +459,7 @@ TEST_CASE("alignSequenceGPU - Local")
     }
 }
 
+
 TEST_CASE("Batch DNA alignment")
 {
     std::vector<std::string> allDnaFiles = getFilenamesInDirectory("data/dna");
@@ -482,13 +483,23 @@ TEST_CASE("Batch DNA alignment")
                 parseArguments(argc, argv, &request);
 
                 // Avoid spending time on very long sequences.
-                if (request.textNumBytes > 10000)
+                if (request.textNumBytes > 20000)
                     continue;
 
                 SequenceAlignment::alignSequenceCPU(request, &responseCPU);
                 SequenceAlignment::alignSequenceGPU(request, &responseGPU);
                 CHECK(responseGPU.score == responseCPU.score);
-                // Don't check text since there can be multiple optimal alignments.
+
+                // Don't check the text since there can be multiple optimal local alignments.
+                if (request.alignmentType != SequenceAlignment::programArgs::LOCAL)
+                {
+                    CHECK(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
+                            std::string(responseGPU.alignedTextBytes, (responseGPU.alignedTextBytes + responseGPU.numAlignmentBytes)));
+                    CHECK(std::string(responseCPU.alignedPatternBytes, (responseCPU.alignedPatternBytes + responseCPU.numAlignmentBytes)) ==
+                            std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
+                    CHECK(responseCPU.startInAlignedText == responseGPU.startInAlignedText);
+                    CHECK(responseCPU.startInAlignedPattern == responseGPU.startInAlignedPattern);
+                }
             }
         }
     }
@@ -517,43 +528,31 @@ TEST_CASE("Batch Protein alignment")
                 parseArguments(argc, argv, &request);
 
                 // Avoid spending time on very long sequences.
-                if (request.textNumBytes > 10000)
+                if (request.textNumBytes > 20000)
                     continue;
 
                 SequenceAlignment::alignSequenceCPU(request, &responseCPU);
                 SequenceAlignment::alignSequenceGPU(request, &responseGPU);
                 CHECK(responseGPU.score == responseCPU.score);
-                // Don't check text since there can be multiple optimal alignments.
+
+                // Don't check the text since there can be multiple optimal local alignments.
+                if (request.alignmentType != SequenceAlignment::programArgs::LOCAL)
+                {
+                    CHECK(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
+                            std::string(responseGPU.alignedTextBytes, (responseGPU.alignedTextBytes + responseGPU.numAlignmentBytes)));
+                    CHECK(std::string(responseCPU.alignedPatternBytes, (responseCPU.alignedPatternBytes + responseCPU.numAlignmentBytes)) ==
+                            std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
+                    CHECK(responseCPU.startInAlignedText == responseGPU.startInAlignedText);
+                    CHECK(responseCPU.startInAlignedPattern == responseGPU.startInAlignedPattern);
+                }
             }
         }
     }
 }
 
-
-TEST_CASE("Very long (>200k) DNA alignment")
-{
-    // // Comment out to no spend too much time for tests.
-    // const int argc = 8;
-    // const char *argv[argc] = {"./alignSequence", "--dna", "--gpu", "--gap-penalty", "5", "--global",
-    //                           "data/dna/AbHV_ORF111.txt", "data/dna/mutated_AbHV_ORF111.txt"};
-    // SequenceAlignment::Request request = {};
-    // parseArguments(argc, argv, &request);
-
-    // SequenceAlignment::Response responseGPU;
-    // SequenceAlignment::Response responseCPU;
-    // SequenceAlignment::alignSequenceGPU(request, &responseGPU);
-    // SequenceAlignment::alignSequenceCPU(request, &responseCPU);
-
-    // CHECK(responseCPU.score == responseGPU.score);
-    // CHECK(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
-    //         std::string(responseGPU.alignedTextBytes, (responseGPU.alignedTextBytes + responseGPU.numAlignmentBytes)));
-    // CHECK(std::string(responseCPU.alignedPatternBytes, (responseCPU.alignedPatternBytes + responseCPU.numAlignmentBytes)) ==
-    //         std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
-}
-
 TEST_CASE("Very long (~70k) Protein alignment")
 {
-    //// Comment out to no spend too much time for tests.
+    // Comment out to not spend too much time for tests - takes 1-2 mins on a 750M.
     // const int argc = 7;
     // const char *argv[argc] = {"./alignSequence", "--protein", "--gap-penalty", "7", "--global",
     //                             "data/protein/qbpln50.txt", "data/protein/mutated_qbpln50.txt"};
@@ -572,3 +571,24 @@ TEST_CASE("Very long (~70k) Protein alignment")
     //         std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
 }
 
+
+TEST_CASE("Very long (>200k) DNA alignment")
+{
+    // // Needs >40GB RAM - run only on Barkla.
+    // const int argc = 8;
+    // const char *argv[argc] = {"./alignSequence", "--dna", "--gpu", "--gap-penalty", "5", "--global",
+    //                           "data/dna/AbHV_ORF111.txt", "data/dna/mutated_AbHV_ORF111.txt"};
+    // SequenceAlignment::Request request = {};
+    // parseArguments(argc, argv, &request);
+
+    // SequenceAlignment::Response responseGPU;
+    // SequenceAlignment::Response responseCPU;
+    // SequenceAlignment::alignSequenceGPU(request, &responseGPU);
+    // SequenceAlignment::alignSequenceCPU(request, &responseCPU);
+
+    // CHECK(responseCPU.score == responseGPU.score);
+    // CHECK(std::string(responseCPU.alignedTextBytes, (responseCPU.alignedTextBytes + responseCPU.numAlignmentBytes)) ==
+    //         std::string(responseGPU.alignedTextBytes, (responseGPU.alignedTextBytes + responseGPU.numAlignmentBytes)));
+    // CHECK(std::string(responseCPU.alignedPatternBytes, (responseCPU.alignedPatternBytes + responseCPU.numAlignmentBytes)) ==
+    //         std::string(responseGPU.alignedPatternBytes, (responseGPU.alignedPatternBytes + responseGPU.numAlignmentBytes)));
+}

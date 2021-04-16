@@ -48,7 +48,6 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
         std::make_pair(1024*16, 1024*16),
         std::make_pair(1024*32, 1024*32),
         std::make_pair(1024*64, 1024*64),
-        // std::make_pair(1024*128, 1024*128),
     };
 
     std::cout << "\nGlobal alignment benchmark:\n";
@@ -112,12 +111,12 @@ void benchmarkFillMatrixSW(bool cpu, bool gpu)
 {
     std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizes =
     {
-        std::make_pair(128, 1024),
-        std::make_pair(256, 1024*2),
-        std::make_pair(512, 1024*4),
-        std::make_pair(1024, 1024*8),
-        std::make_pair(1024*2, 1024*16),
-        std::make_pair(1024*4, 1024*32),
+        std::make_pair(512*2, 1024*2),
+        std::make_pair(512*4, 1024*4),
+        std::make_pair(512*8, 1024*8),
+        std::make_pair(512*16, 1024*16),
+        std::make_pair(512*32, 1024*32),
+        std::make_pair(512*64, 1024*64),
     };
 
     std::cout << "\nLocal alignment benchmark:\n";
@@ -172,7 +171,6 @@ void benchmarkBatch (bool cpu, bool gpu, bool isGlobal, int nBatches)
 {
     std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizes =
     {
-        std::make_pair(256, 256),
         std::make_pair(512, 512),
         std::make_pair(1024, 1024),
         std::make_pair(2048, 2048),
@@ -233,14 +231,11 @@ int main(int argc, const char *argv[])
 
     benchmarkFillMatrixSW(true, true);
 
-    // Undefine BENCHMARK to use benchmarkBatch.
+    // NOTE:
+    // Undefine BENCHMARK macro at top of file to use benchmarkBatch.
     // In the batch benchmark, we measure the execution time of the whole system
     // when multiple sequences are aligned in quick succession. The BENCHMARK macro declares that
     // the time of just one run should be mesured.
-    // benchmarkBatch (true, true, true, 200);
-    // benchmarkBatch (true, true, false, 200);
-    // benchmarkBatch (true, true, true, 500);
-    // benchmarkBatch (true, true, false, 500);
     // benchmarkBatch (true, true, true, 1000);
     // benchmarkBatch (true, true, false, 1000);
 
