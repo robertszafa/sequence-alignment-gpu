@@ -14,7 +14,9 @@ struct __align__(8) columnState { int score; int kernelId; };
 __device__ __forceinline__ void set_done(columnState* volatile colState, const unsigned int col,
                                          const int score, const int kernelId)
 {
-    colState[col] = {score, kernelId+1};
+    // New kernelId and new score need to be set at the same time.
+    columnState newState = {score, kernelId+1};
+    atomicExch((unsigned long long int*) (colState+col), *((unsigned long long int*) &newState));
 }
 
 /// Given a column and a kernelId, spin while the kernelId of that column
@@ -23,10 +25,13 @@ __device__ __forceinline__ void set_done(columnState* volatile colState, const u
 __device__ __forceinline__ int get_prev_score(columnState* volatile colState, const unsigned int col,
                                               const int kernelId)
 {
-    volatile int currKernelId = colState[col].kernelId;
-    while (currKernelId != kernelId)
-        currKernelId = colState[col].kernelId;
+    // atomicCAS does a conditional swap, and returns the new/old value depending on success:
+    // colState[col].kernelId = (kernelId == colState[col].kernelId)
+    //                          ? kernelId : colState[col].kernelId)
+    while (kernelId != atomicCAS((int*) &(colState[col].kernelId), kernelId, kernelId))
+        continue;
 
+    // kernelId and score are set atomically, so we are safe to return the score at this point.
     return colState[col].score;
 }
 
