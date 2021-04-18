@@ -1,5 +1,5 @@
 NVCC=nvcc
-CUDA_FLAGS=-std=c++14 -m64 -arch=sm_30 -O3 --expt-relaxed-constexpr
+CUDA_FLAGS=-std=c++14 -m64 -O3 --expt-relaxed-constexpr -Xcompiler -fopenmp
 
 BIN=alignSequence
 TEST_BIN=test

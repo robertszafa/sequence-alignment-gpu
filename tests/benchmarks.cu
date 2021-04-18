@@ -5,14 +5,15 @@
 /// Number of discarderded runs for warm up, bring data in mem, etc.
 #define NUM_WARMUPS 5
 
-#include "../SequenceAlignment.hpp"
-#include "old_alignSequenceGPU.cu"
-
 #include <iostream>
 #include <utility>
-#include <chrono>
-
+// #include <chrono>
+// chrono is not available on barkla.
+#include <omp.h>
 #include <stdlib.h>
+
+#include "../SequenceAlignment.hpp"
+#include "old_alignSequenceGPU.cu"
 
 
 void fillDummyRequest(SequenceAlignment::Request &request, const uint64_t numRows, const uint64_t numCols)
@@ -69,10 +70,10 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
                 fillMatrixNW(M, numRows, numCols, request);
             for (int i=0; i<NUM_REPEATS; ++i)
             {
-                auto begin = std::chrono::steady_clock::now();
+                auto begin = omp_get_wtime();
                 fillMatrixNW(M, numRows, numCols, request);
-                auto end = std::chrono::steady_clock::now();
-                totalTimeCPU += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+                auto end = omp_get_wtime();
+                totalTimeCPU += (end - begin) * 1000.0;
             }
             std::cout << "CPU = " << (totalTimeCPU/NUM_REPEATS) << " ms\n"
                       << "MCUPS: " << int((numRows * numCols) / ((totalTimeCPU/NUM_REPEATS) * 1000.0)) << "\n\n"; // /1000 for seconds * 1000000 for MCUPS
@@ -140,10 +141,10 @@ void benchmarkFillMatrixSW(bool cpu, bool gpu)
                 fillMatrixSW(M, numRows, numCols, request);
             for (int i=0; i<NUM_REPEATS; ++i)
             {
-                auto begin = std::chrono::steady_clock::now();
+                auto begin = omp_get_wtime();
                 fillMatrixSW(M, numRows, numCols, request);
-                auto end = std::chrono::steady_clock::now();
-                totalTimeCPU += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+                auto end = omp_get_wtime();
+                totalTimeCPU += (end - begin) * 1000.0;
             }
             std::cout << "CPU = " << (totalTimeCPU/NUM_REPEATS) << " ms\n"
                       << "MCUPS: " << int((numRows * numCols) / ((totalTimeCPU/NUM_REPEATS) * 1000.0)) << "\n\n";
@@ -197,12 +198,12 @@ void benchmarkBatch (bool cpu, bool gpu, bool isGlobal, int nBatches)
         int totalTimeCPU = 0;
         if (cpu)
         {
-            auto begin = std::chrono::steady_clock::now();
+            auto begin = omp_get_wtime();
             for (int i=0; i<nBatches; ++i)
                 alignSequenceCPU(requests[i], &responsesCPU[i]);
 
-            auto end = std::chrono::steady_clock::now();
-            totalTimeCPU += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+            auto end = omp_get_wtime();
+            totalTimeCPU += (end - begin) * 1000.0;
             std::cout << "CPU = " << totalTimeCPU << " ms\n"
                       << "MCUPS: " << int((numRows * numCols * nBatches) / (totalTimeCPU * 1000.0)) << "\n\n"; // /1000 for seconds * 1000000 for MCUPS
         }
@@ -210,12 +211,12 @@ void benchmarkBatch (bool cpu, bool gpu, bool isGlobal, int nBatches)
         int totalTimeGPU = 0;
         if (gpu)
         {
-            auto begin = std::chrono::steady_clock::now();
+            auto begin = omp_get_wtime();
             for (int i=0; i<nBatches; ++i)
                 SequenceAlignment::alignSequenceGPU(requests[i], &responsesGPU[i]);
 
-            auto end = std::chrono::steady_clock::now();
-            totalTimeGPU += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+            auto end = omp_get_wtime();
+            totalTimeGPU += (end - begin) * 1000.0;
             std::cout << "GPU = " << totalTimeGPU << " ms\n"
                       << "MCUPS: " << int((numRows * numCols * nBatches) / (totalTimeGPU * 1000.0)) << "\n\n"; // /1000 for seconds * 1000000 for MCUPS
         }
@@ -227,17 +228,23 @@ void benchmarkBatch (bool cpu, bool gpu, bool isGlobal, int nBatches)
 
 int main(int argc, const char *argv[])
 {
-    benchmarkFillMatrixNW(true, true, false);
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+    std::cout << "Benchmark on GPU: " << deviceProp.name << "\n";
 
-    benchmarkFillMatrixSW(true, true);
+    // Don't time CPU on barkla.
+
+    benchmarkFillMatrixNW(false, true, false);
+
+    benchmarkFillMatrixSW(false, true);
 
     // NOTE:
     // Undefine BENCHMARK macro at top of file to use benchmarkBatch.
     // In the batch benchmark, we measure the execution time of the whole system
     // when multiple sequences are aligned in quick succession. The BENCHMARK macro declares that
     // the time of just one run should be mesured.
-    // benchmarkBatch (true, true, true, 1000);
-    // benchmarkBatch (true, true, false, 1000);
+    // benchmarkBatch (false, true, true, 1000);
+    // benchmarkBatch (false, true, false, 1000);
 
     return 0;
 }

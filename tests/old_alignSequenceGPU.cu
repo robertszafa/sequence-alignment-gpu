@@ -127,7 +127,7 @@ int old_alignSequenceGPU(const SequenceAlignment::Request &request,
     /** End Allocate and transfer memory */
 
     #ifdef BENCHMARK
-        auto begin = std::chrono::steady_clock::now();
+        auto begin = omp_get_wtime();
     #endif
 
     const unsigned int sharedMemSize = 2 * numCols * sizeof(int);
@@ -146,8 +146,8 @@ int old_alignSequenceGPU(const SequenceAlignment::Request &request,
     freeMemory();
 
     #ifdef BENCHMARK
-        auto end = std::chrono::steady_clock::now();
-        return std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+        auto end = omp_get_wtime();
+        return (end - begin) * 1000.0;
     #endif
 
 

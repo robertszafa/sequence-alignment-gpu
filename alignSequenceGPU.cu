@@ -545,7 +545,7 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
                                        request.alphabetSize * request.alphabetSize * sizeof(int);
 
     #ifdef BENCHMARK
-        auto begin = std::chrono::steady_clock::now();
+        auto begin = omp_get_wtime();
     #endif
 
 
@@ -605,9 +605,9 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
         // If benchmarking, return the time taken instead of error code.
         // Measure with data transfer back to the host.
         cudaStreamSynchronize(currCuStream);
-        auto end = std::chrono::steady_clock::now();
+        auto end = omp_get_wtime();
         cleanUp();
-        return std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+        return 1000.0 * (end - begin);
     #endif
 
     if (request.alignmentType == programArgs::GLOBAL)
