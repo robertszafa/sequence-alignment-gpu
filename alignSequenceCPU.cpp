@@ -18,9 +18,11 @@ void SequenceAlignment::traceBackSW(const char *M, const uint64_t start, const u
     auto curr = start;
     while (M[curr] != DIRECTION::STOP)
     {
+        auto dir = M[curr];
+
         // Was it a match, gap in text or gap in pattern?
-        const bool takeText = (M[curr] == DIRECTION::DIAG || M[curr] == DIRECTION::LEFT);
-        const bool takePattern = (M[curr] == DIRECTION::DIAG || M[curr] == DIRECTION::TOP);
+        const bool takeText = (dir == DIRECTION::DIAG || dir == DIRECTION::LEFT);
+        const bool takePattern = (dir == DIRECTION::DIAG || dir == DIRECTION::TOP);
 
         // Translate from alphabet indexes to alphabet letters.
         const char translatedText = request.alphabet[request.textBytes[textIndex]];
@@ -35,12 +37,16 @@ void SequenceAlignment::traceBackSW(const char *M, const uint64_t start, const u
         response->numAlignmentBytes += 1;
 
         // Go to next cell.
-        curr -= (M[curr] == DIRECTION::LEFT) +
-                ((M[curr] == DIRECTION::DIAG) * (numCols+1)) +
-                ((M[curr] == DIRECTION::TOP) * (numCols));
+        curr -= (dir == DIRECTION::LEFT) +
+                ((dir == DIRECTION::DIAG) * (numCols+1)) +
+                ((dir == DIRECTION::TOP) * (numCols));
+
+        // First row or col?
+        if (curr % numCols == 0 || curr < numCols)
+            break;
 
         // Update text and pattern indices depending which one was used.
-        if (M[curr] != DIRECTION::STOP)
+        if (dir != DIRECTION::STOP)
         {
             textIndex = std::max(0, textIndex - takeText);
             patternIndex = std::max(0, patternIndex - takePattern);
@@ -56,7 +62,7 @@ void SequenceAlignment::traceBackSW(const char *M, const uint64_t start, const u
 }
 
 void SequenceAlignment::traceBackNW(const char *M, const uint64_t numRows, const uint64_t numCols,
-                                  const Request &request, Response *response)
+                                    const Request &request, Response *response)
 {
     uint64_t curr = numRows * numCols - 1;
     int textIndex = request.textNumBytes - 1;
@@ -66,9 +72,17 @@ void SequenceAlignment::traceBackNW(const char *M, const uint64_t numRows, const
 
     while (curr > 0)
     {
+        auto dir = M[curr];
+
+        // First row or col?
+        if (curr % numCols == 0)
+            dir = DIRECTION::TOP;
+        else if (curr < numCols)
+            dir = DIRECTION::LEFT;
+
         // Was it a match, gap in text or gap in pattern?
-        const bool takeText = (M[curr] == DIRECTION::DIAG || M[curr] == DIRECTION::LEFT);
-        const bool takePattern = (M[curr] == DIRECTION::DIAG || M[curr] == DIRECTION::TOP);
+        const bool takeText = (dir == DIRECTION::DIAG || dir == DIRECTION::LEFT);
+        const bool takePattern = (dir == DIRECTION::DIAG || dir == DIRECTION::TOP);
 
         // Translate from alphabet indexes to alphabet letters.
         const char translatedText = request.alphabet[request.textBytes[textIndex]];
@@ -86,9 +100,9 @@ void SequenceAlignment::traceBackNW(const char *M, const uint64_t numRows, const
         textIndex = std::max(0, textIndex - takeText);
         patternIndex = std::max(0, patternIndex - takePattern);
         // Go to next cell.
-        curr -= (M[curr] == DIRECTION::LEFT) +
-                ((M[curr] == DIRECTION::DIAG) * (numCols+1)) +
-                ((M[curr] == DIRECTION::TOP) * (numCols));
+        curr -= (dir == DIRECTION::LEFT) +
+                ((dir == DIRECTION::DIAG) * (numCols+1)) +
+                ((dir == DIRECTION::TOP) * (numCols));
     }
 
     response->startInAlignedText = textIndex;

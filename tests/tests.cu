@@ -361,8 +361,8 @@ TEST_CASE("alignSequenceCPU - Local")
         SequenceAlignment::alignSequenceCPU(request, &response);
 
         CHECK(57 == response.score);
-        CHECK(4204 == response.startInAlignedText);
-        CHECK(95 == response.startInAlignedPattern);
+        CHECK(4203 == response.startInAlignedText);
+        CHECK(94 == response.startInAlignedPattern);
     }
 
 }

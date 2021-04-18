@@ -227,6 +227,10 @@ void benchmarkBatch (bool cpu, bool gpu, bool isGlobal, int nBatches)
 
 int main(int argc, const char *argv[])
 {
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+    std::cout << "Benchmark on GPU: " << deviceProp.name << "\n";
+
     benchmarkFillMatrixNW(true, true, false);
 
     benchmarkFillMatrixSW(true, true);
