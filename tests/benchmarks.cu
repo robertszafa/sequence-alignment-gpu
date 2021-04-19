@@ -72,10 +72,11 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
                 auto begin = std::chrono::steady_clock::now();
                 fillMatrixNW(M, numRows, numCols, request);
                 auto end = std::chrono::steady_clock::now();
-                totalTimeCPU += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+                totalTimeCPU += std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
             }
-            std::cout << "CPU = " << (totalTimeCPU/NUM_REPEATS) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols) / ((totalTimeCPU/NUM_REPEATS) * 1000.0)) << "\n\n"; // /1000 for seconds * 1000000 for MCUPS
+            // we measure in microseconds (1e6) - no more conversion needed for MCUPS
+            std::cout << "CPU = " << (totalTimeCPU / (NUM_REPEATS*1000)) << " ms\n"
+                      << "MCUPS: " << int((numRows * numCols) / (totalTimeCPU/NUM_REPEATS)) << "\n\n";
         }
 
         int totalTimeGPU = 0;
@@ -85,8 +86,8 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
                 SequenceAlignment::alignSequenceGPU(request, &response);
             for (int i=0; i<NUM_REPEATS; ++i)
                 totalTimeGPU += SequenceAlignment::alignSequenceGPU(request, &response);
-            std::cout << "GPU = " << (totalTimeGPU/NUM_REPEATS) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols) / ((totalTimeGPU/NUM_REPEATS) * 1000.0)) << "\n\n";
+            std::cout << "GPU = " << (totalTimeGPU / (NUM_REPEATS*1000)) << " ms\n"
+                      << "MCUPS: " << int((numRows * numCols) / (totalTimeGPU/NUM_REPEATS)) << "\n\n";
         }
 
         int totalTimeGPU_horizontal = 0;
@@ -96,8 +97,8 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
                 old_alignSequenceGPU(request, &response);
             for (int i=0; i<NUM_REPEATS; ++i)
                 totalTimeGPU_horizontal += old_alignSequenceGPU(request, &response);
-            std::cout << "GPU (horizontal) = " << (totalTimeGPU_horizontal/NUM_REPEATS) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols) / ((totalTimeGPU_horizontal/NUM_REPEATS) * 1000.0)) << "\n\n";
+            std::cout << "GPU (horizontal) = " << (totalTimeGPU_horizontal / (NUM_REPEATS*1000)) << " ms\n"
+                      << "MCUPS: " << int((numRows * numCols) / ((totalTimeGPU_horizontal/NUM_REPEATS))) << "\n\n";
         }
 
         std::cout << "GPU Speedup = " << (double(totalTimeCPU)/double(totalTimeGPU)) << "\n";
@@ -143,10 +144,10 @@ void benchmarkFillMatrixSW(bool cpu, bool gpu)
                 auto begin = std::chrono::steady_clock::now();
                 fillMatrixSW(M, numRows, numCols, request);
                 auto end = std::chrono::steady_clock::now();
-                totalTimeCPU += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+                totalTimeCPU += std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
             }
-            std::cout << "CPU = " << (totalTimeCPU/NUM_REPEATS) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols) / ((totalTimeCPU/NUM_REPEATS) * 1000.0)) << "\n\n";
+            std::cout << "CPU = " << (totalTimeCPU / (NUM_REPEATS*1000)) << " ms\n"
+                      << "MCUPS: " << int((numRows * numCols) / (totalTimeCPU/NUM_REPEATS)) << "\n\n";
         }
 
         int totalTimeGPU = 0;
@@ -156,8 +157,8 @@ void benchmarkFillMatrixSW(bool cpu, bool gpu)
                 SequenceAlignment::alignSequenceGPU(request, &response);
             for (int i=0; i<NUM_REPEATS; ++i)
                 totalTimeGPU += SequenceAlignment::alignSequenceGPU(request, &response);
-            std::cout << "GPU = " << (totalTimeGPU/NUM_REPEATS) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols) / ((totalTimeGPU/NUM_REPEATS) * 1000.0)) << "\n\n";
+            std::cout << "GPU = " << (totalTimeGPU/ (NUM_REPEATS*1000)) << " ms\n"
+                      << "MCUPS: " << int((numRows * numCols) / (totalTimeGPU/NUM_REPEATS)) << "\n\n";
         }
 
         std::cout << "GPU Speedup = " << (double(totalTimeCPU)/double(totalTimeGPU)) << "\n";
@@ -202,9 +203,9 @@ void benchmarkBatch (bool cpu, bool gpu, bool isGlobal, int nBatches)
                 alignSequenceCPU(requests[i], &responsesCPU[i]);
 
             auto end = std::chrono::steady_clock::now();
-            totalTimeCPU += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-            std::cout << "CPU = " << totalTimeCPU << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols * nBatches) / (totalTimeCPU * 1000.0)) << "\n\n"; // /1000 for seconds * 1000000 for MCUPS
+            totalTimeCPU += std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+            std::cout << "CPU = " << (totalTimeCPU / 1000) << " ms\n"
+                      << "MCUPS: " << int((numRows * numCols * nBatches) / totalTimeCPU) << "\n\n";
         }
 
         int totalTimeGPU = 0;
@@ -215,9 +216,9 @@ void benchmarkBatch (bool cpu, bool gpu, bool isGlobal, int nBatches)
                 SequenceAlignment::alignSequenceGPU(requests[i], &responsesGPU[i]);
 
             auto end = std::chrono::steady_clock::now();
-            totalTimeGPU += std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-            std::cout << "GPU = " << totalTimeGPU << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols * nBatches) / (totalTimeGPU * 1000.0)) << "\n\n"; // /1000 for seconds * 1000000 for MCUPS
+            totalTimeGPU += std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+            std::cout << "GPU = " << (totalTimeGPU / 1000) << " ms\n"
+                      << "MCUPS: " << int((numRows * numCols * nBatches) / totalTimeGPU) << "\n\n";
         }
 
         std::cout << "GPU Speedup = " << (double(totalTimeCPU)/double(totalTimeGPU)) << "\n";

@@ -607,7 +607,7 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
         cudaStreamSynchronize(currCuStream);
         auto end = std::chrono::steady_clock::now();
         cleanUp();
-        return std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+        return std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
     #endif
 
     if (request.alignmentType == programArgs::GLOBAL)

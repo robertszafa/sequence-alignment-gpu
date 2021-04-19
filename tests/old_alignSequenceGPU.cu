@@ -147,7 +147,7 @@ int old_alignSequenceGPU(const SequenceAlignment::Request &request,
 
     #ifdef BENCHMARK
         auto end = std::chrono::steady_clock::now();
-        return std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+        return std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
     #endif
 
 
