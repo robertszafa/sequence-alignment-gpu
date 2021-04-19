@@ -1,0 +1,101 @@
+Benchmark on GPU: GeForce GT 750M
+
+Global alignment benchmark:
+-----  1024 x 1024  -----
+CPU = 24 ms
+MCUPS: 43
+
+GPU = 8 ms
+MCUPS: 131
+
+GPU Speedup = 3.075
+-----  4096 x 4096  -----
+CPU = 386 ms
+MCUPS: 43
+
+GPU = 53 ms
+MCUPS: 316
+
+GPU Speedup = 7.27068
+-----  8192 x 8192  -----
+CPU = 1556 ms
+MCUPS: 43
+
+GPU = 186 ms
+MCUPS: 360
+
+GPU Speedup = 8.35875
+-----  16384 x 16384  -----
+CPU = 6194 ms
+MCUPS: 43
+
+GPU = 744 ms
+MCUPS: 360
+
+GPU Speedup = 8.32384
+-----  32768 x 32768  -----
+CPU = 24742 ms
+MCUPS: 43
+
+GPU = 3119 ms
+MCUPS: 344
+
+GPU Speedup = 7.93115
+-----  65536 x 65536  -----
+CPU = 98896 ms
+MCUPS: 43
+
+GPU = 13251 ms
+MCUPS: 324
+
+GPU Speedup = 7.46309
+
+Local alignment benchmark:
+-----  1024 x 2048  -----
+CPU = 73 ms
+MCUPS: 28
+
+GPU = 6 ms
+MCUPS: 349
+
+GPU Speedup = 12.2
+-----  2048 x 4096  -----
+CPU = 288 ms
+MCUPS: 29
+
+GPU = 25 ms
+MCUPS: 335
+
+GPU Speedup = 11.4286
+-----  4096 x 8192  -----
+CPU = 1157 ms
+MCUPS: 29
+
+GPU = 98 ms
+MCUPS: 342
+
+GPU Speedup = 11.7581
+-----  8192 x 16384  -----
+CPU = 4621 ms
+MCUPS: 29
+
+GPU = 378 ms
+MCUPS: 355
+
+GPU Speedup = 12.2254
+-----  16384 x 32768  -----
+CPU = 18741 ms
+MCUPS: 28
+
+GPU = 1647 ms
+MCUPS: 325
+
+GPU Speedup = 11.3736
+-----  32768 x 65536  -----
+CPU = 73793 ms
+MCUPS: 29
+
+GPU = 6663 ms
+MCUPS: 322
+
+GPU Speedup = 11.0745
