@@ -122,9 +122,9 @@ Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile pattern
     enum DIRECTION { LEFT, DIAG, TOP, STOP};
 
 
-    int alignSequenceCPU(const Request&, Response*);
+    uint64_t alignSequenceCPU(const Request&, Response*);
 
-    int alignSequenceGPU(const Request&, Response*);
+    uint64_t alignSequenceGPU(const Request&, Response*);
 
     void traceBackNW(const char*, const uint64_t, const uint64_t, const Request&, Response*);
 

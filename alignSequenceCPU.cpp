@@ -284,8 +284,8 @@ int fillMatrixNW(char *M, const uint64_t numRows, const uint64_t numCols,
 }
 
 
-int SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &request,
-                                        SequenceAlignment::Response *response)
+uint64_t SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &request,
+                                             SequenceAlignment::Response *response)
 {
 
     char *M = nullptr;
@@ -311,7 +311,7 @@ int SequenceAlignment::alignSequenceCPU(const SequenceAlignment::Request &reques
     {
         std::cerr << SequenceAlignment::MEM_ERROR;
         cleanUp();
-        return -1;
+        return 1;
     }
     /** End Allocate memory */
 

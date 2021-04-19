@@ -134,7 +134,7 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
     if (argc == 1)
     {
         std::cerr << SequenceAlignment::USAGE;
-        return -1;
+        return 1;
     }
 
     // Set all to default.
@@ -194,7 +194,7 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
             catch (...) // std::invalid_argument, std::out_of_range
             {
                 std::cerr << SequenceAlignment::GAP_PENALTY_NOT_READ_ERROR;
-                return -1;
+                return 1;
             }
             gapPenaltyState = flagState::READ;
         }
@@ -203,7 +203,7 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
             if (parseScoreMatrixFile(argv[i], request->alphabetSize, request->scoreMatrix) == -1)
             {
                 std::cerr << SequenceAlignment::SCORE_MATRIX_NOT_READ_ERROR;
-                return -1;
+                return 1;
             }
             scoreMatrixState = flagState::READ;
         }
@@ -212,7 +212,7 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
             if (readSequenceFile(argv[i], request) == -1)
             {
                 std::cerr << SequenceAlignment::SEQ_NOT_READ_ERROR;
-                return -1;
+                return 1;
             }
         }
     }
@@ -220,7 +220,7 @@ int parseArguments(int argc, const char *argv[], SequenceAlignment::Request *req
     if (request->textNumBytes == 0 || request->patternNumBytes == 0)
     {
         std::cerr << SequenceAlignment::SEQ_NOT_READ_ERROR << SequenceAlignment::USAGE;
-        return -1;
+        return 1;
     }
     else if (request->textNumBytes < request->patternNumBytes)
     {

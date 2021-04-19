@@ -451,8 +451,8 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
     return numThreads;
 }
 
-int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &request,
-                                        SequenceAlignment::Response *response)
+uint64_t SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &request,
+                                             SequenceAlignment::Response *response)
 {
     const uint64_t numCols = request.textNumBytes + 1;
     const uint64_t numRows = request.patternNumBytes + 1;
@@ -470,7 +470,7 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
     //      - one stream per 1024 rows,
     //      - no more streams than the number of available SMs.
     const int numCuStreams = std::min(std::max((int) (numRows + 1) / MAX_THREADS_PER_BLOCK, 1),
-                                           std::min(MAX_CONCURRENT_KERNELS, deviceProp.multiProcessorCount));
+                                      std::min(MAX_CONCURRENT_KERNELS, deviceProp.multiProcessorCount));
     // Will hold the number of kernel invocations required for the input sequences.
     int numKernels = 0;
     std::vector<cudaStream_t> cuStreams(numCuStreams);
@@ -535,7 +535,7 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
     {
         std::cout << MEM_ERROR;
         cleanUp();
-        return -1;
+        return 1;
     }
     numKernels = (numRows/NUM_THREADS_PER_BLOCK) + 1;
     /** End Allocate and transfer memory */
@@ -545,7 +545,8 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
                                        request.alphabetSize * request.alphabetSize * sizeof(int);
 
     #ifdef BENCHMARK
-        auto begin = std::chrono::steady_clock::now();
+        struct timeval t1, t2, res;
+        gettimeofday(&t1, 0);
     #endif
 
 
@@ -581,7 +582,7 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
             std::cout << "error: could not copy from device memory\n";
             cudaDeviceSynchronize();
             cleanUp();
-            return -1;
+            return 1;
         }
         curr_h_M += numThreads*numCols;
 
@@ -594,7 +595,7 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
                 std::cout << "error: could not copy from device memory\n";
                 cudaDeviceSynchronize();
                 cleanUp();
-                return -1;
+                return 1;
             }
         }
 
@@ -604,10 +605,16 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
     #ifdef BENCHMARK
         // If benchmarking, return the time taken instead of error code.
         // Measure with data transfer back to the host.
+        if (request.alignmentType == programArgs::GLOBAL)
+            cudaMemcpyAsync(h_maxScores, &(d_columnState[numCols - 1].score), sizeof(int), cudaMemcpyDeviceToHost, currCuStream);
         cudaStreamSynchronize(currCuStream);
-        auto end = std::chrono::steady_clock::now();
+
+        gettimeofday(&t2, 0);
+        timersub(&t2, &t1, &res);
+
         cleanUp();
-        return std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        // Return time in microseconds.
+        return 1000000 * uint64_t(res.tv_sec) + uint64_t(res.tv_usec);
     #endif
 
     if (request.alignmentType == programArgs::GLOBAL)
@@ -617,7 +624,7 @@ int SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &reques
         {
             std::cout << "error: could not copy from device memory\n";
             cleanUp();
-            return -1;
+            return 1;
         }
 
         cudaStreamSynchronize(currCuStream);

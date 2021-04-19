@@ -75,7 +75,7 @@ __global__ void cuda_fillMatrixNW_horizontal(const char *textBytes, const char *
         finalScore[0] = _thisScores[tid];
 }
 
-int old_alignSequenceGPU(const SequenceAlignment::Request &request,
+uint64_t old_alignSequenceGPU(const SequenceAlignment::Request &request,
                                SequenceAlignment::Response *response)
 {
     const uint64_t numRows = request.textNumBytes + 1;
@@ -91,7 +91,7 @@ int old_alignSequenceGPU(const SequenceAlignment::Request &request,
     }
     catch(const std::bad_alloc& e)
     {
-        return -1;
+        return 1;
     }
     /** End Allocate host memory */
 
@@ -127,7 +127,8 @@ int old_alignSequenceGPU(const SequenceAlignment::Request &request,
     /** End Allocate and transfer memory */
 
     #ifdef BENCHMARK
-        auto begin = std::chrono::steady_clock::now();
+        struct timeval t1, t2, res;
+        gettimeofday(&t1, 0);
     #endif
 
     const unsigned int sharedMemSize = 2 * numCols * sizeof(int);
@@ -141,13 +142,15 @@ int old_alignSequenceGPU(const SequenceAlignment::Request &request,
     {
         std::cout << "Could not copy back to host memory" << std::endl;
         freeMemory();
-        return -1;
+        return 1;
     }
     freeMemory();
 
     #ifdef BENCHMARK
-        auto end = std::chrono::steady_clock::now();
-        return std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        gettimeofday(&t2, 0);
+        timersub(&t2, &t1, &res);
+        // Return time in microseconds.
+        return 1000000 * uint64_t(res.tv_sec) + uint64_t(res.tv_usec);
     #endif
 
 

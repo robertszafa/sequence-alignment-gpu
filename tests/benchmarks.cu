@@ -1,18 +1,16 @@
 #define BENCHMARK
 
-/// Number of experiment repetitions.
-#define NUM_REPEATS 5
-/// Number of discarderded runs for warm up, bring data in mem, etc.
-#define NUM_WARMUPS 5
-
-#include "../SequenceAlignment.hpp"
-#include "old_alignSequenceGPU.cu"
+/// Best-out-of-N time is picked
+#define NUM_REPEATS 10
 
 #include <iostream>
 #include <utility>
-#include <chrono>
 
+#include <sys/time.h>
 #include <stdlib.h>
+
+#include "../SequenceAlignment.hpp"
+#include "old_alignSequenceGPU.cu"
 
 
 void fillDummyRequest(SequenceAlignment::Request &request, const uint64_t numRows, const uint64_t numCols)
@@ -42,6 +40,7 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
 {
     std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizes =
     {
+        std::make_pair(512, 512),
         std::make_pair(1024, 1024),
         std::make_pair(1024*4, 1024*4),
         std::make_pair(1024*8, 1024*8),
@@ -62,46 +61,51 @@ void benchmarkFillMatrixNW(bool cpu, bool gpu, bool old_gpu)
         fillDummyRequest(request, numRows, numCols);
         char *M = new char[numRows * numCols];
 
-        int totalTimeCPU = 0;
+        struct timeval t1, t2, res;
+
+        uint64_t cpuTime = UINT64_MAX;
         if (cpu)
         {
-            for (int i=0; i<NUM_WARMUPS; ++i)
-                fillMatrixNW(M, numRows, numCols, request);
             for (int i=0; i<NUM_REPEATS; ++i)
             {
-                auto begin = std::chrono::steady_clock::now();
+                gettimeofday(&t1, 0);
                 fillMatrixNW(M, numRows, numCols, request);
-                auto end = std::chrono::steady_clock::now();
-                totalTimeCPU += std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+                gettimeofday(&t2, 0);
+
+                timersub(&t2, &t1, &res);
+                cpuTime = std::min(cpuTime, 1000000 * uint64_t(res.tv_sec) + uint64_t(res.tv_usec));
             }
+
+            // Ensure we don't divide by 0.
+            cpuTime = std::max(uint64_t(1), cpuTime);
             // we measure in microseconds (1e6) - no more conversion needed for MCUPS
-            std::cout << "CPU = " << (totalTimeCPU / (NUM_REPEATS*1000)) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols) / (totalTimeCPU/NUM_REPEATS)) << "\n\n";
+            std::cout << "CPU = " << (cpuTime / 1000) << " ms\n" // display in ms
+                      << "MCUPS: " << ((numRows * numCols) / cpuTime) << "\n\n";
         }
 
-        int totalTimeGPU = 0;
+        uint64_t gpuTime = UINT64_MAX;
         if (gpu)
         {
-            for (int i=0; i<NUM_WARMUPS; ++i)
-                SequenceAlignment::alignSequenceGPU(request, &response);
             for (int i=0; i<NUM_REPEATS; ++i)
-                totalTimeGPU += SequenceAlignment::alignSequenceGPU(request, &response);
-            std::cout << "GPU = " << (totalTimeGPU / (NUM_REPEATS*1000)) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols) / (totalTimeGPU/NUM_REPEATS)) << "\n\n";
+                gpuTime = std::min(gpuTime, SequenceAlignment::alignSequenceGPU(request, &response));
+
+            gpuTime = std::max(uint64_t(1), gpuTime);
+            std::cout << "GPU = " << (gpuTime / 1000) << " ms\n"
+                      << "MCUPS: " << ((numRows * numCols) / gpuTime) << "\n\n";
         }
 
-        int totalTimeGPU_horizontal = 0;
+        uint64_t gpuTime_horizontal = UINT64_MAX;
         if (old_gpu)
         {
-            for (int i=0; i<NUM_WARMUPS; ++i)
-                old_alignSequenceGPU(request, &response);
             for (int i=0; i<NUM_REPEATS; ++i)
-                totalTimeGPU_horizontal += old_alignSequenceGPU(request, &response);
-            std::cout << "GPU (horizontal) = " << (totalTimeGPU_horizontal / (NUM_REPEATS*1000)) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols) / ((totalTimeGPU_horizontal/NUM_REPEATS))) << "\n\n";
+                gpuTime_horizontal = std::min(gpuTime_horizontal, old_alignSequenceGPU(request, &response));
+
+            gpuTime_horizontal = std::max(uint64_t(1), gpuTime_horizontal);
+            std::cout << "GPU (horizontal) = " << (gpuTime_horizontal / 1000) << " ms\n"
+                      << "MCUPS: " << ((numRows * numCols) / gpuTime_horizontal) << "\n\n";
         }
 
-        std::cout << "GPU Speedup = " << (double(totalTimeCPU)/double(totalTimeGPU)) << "\n";
+        std::cout << "GPU Speedup = " << (double(cpuTime) / double(gpuTime)) << "\n";
 
         delete [] M;
     }
@@ -112,6 +116,7 @@ void benchmarkFillMatrixSW(bool cpu, bool gpu)
 {
     std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizes =
     {
+        std::make_pair(512, 1024),
         std::make_pair(512*2, 1024*2),
         std::make_pair(512*4, 1024*4),
         std::make_pair(512*8, 1024*8),
@@ -134,47 +139,54 @@ void benchmarkFillMatrixSW(bool cpu, bool gpu)
         request.alignmentType = SequenceAlignment::programArgs::LOCAL;
         char *M = new char[numRows * numCols];
 
-        int totalTimeCPU = 0;
+        struct timeval t1, t2, res;
+
+        uint64_t cpuTime = UINT64_MAX;
         if (cpu)
         {
-            for (int i=0; i<NUM_WARMUPS; ++i)
-                fillMatrixSW(M, numRows, numCols, request);
             for (int i=0; i<NUM_REPEATS; ++i)
             {
-                auto begin = std::chrono::steady_clock::now();
+                gettimeofday(&t1, 0);
                 fillMatrixSW(M, numRows, numCols, request);
-                auto end = std::chrono::steady_clock::now();
-                totalTimeCPU += std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+                gettimeofday(&t2, 0);
+
+                timersub(&t2, &t1, &res);
+                cpuTime = std::min(cpuTime, 1000000 * uint64_t(res.tv_sec) + uint64_t(res.tv_usec));
             }
-            std::cout << "CPU = " << (totalTimeCPU / (NUM_REPEATS*1000)) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols) / (totalTimeCPU/NUM_REPEATS)) << "\n\n";
+
+            cpuTime = std::max(uint64_t(1), cpuTime);
+            // we measure in microseconds (1e6) - no more conversion needed for MCUPS
+            std::cout << "CPU = " << (cpuTime / 1000) << " ms\n" // display in ms
+                      << "MCUPS: " << ((numRows * numCols) / cpuTime) << "\n\n";
         }
 
-        int totalTimeGPU = 0;
+        uint64_t gpuTime = UINT64_MAX;
         if (gpu)
         {
-            for (int i=0; i<NUM_WARMUPS; ++i)
-                SequenceAlignment::alignSequenceGPU(request, &response);
             for (int i=0; i<NUM_REPEATS; ++i)
-                totalTimeGPU += SequenceAlignment::alignSequenceGPU(request, &response);
-            std::cout << "GPU = " << (totalTimeGPU/ (NUM_REPEATS*1000)) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols) / (totalTimeGPU/NUM_REPEATS)) << "\n\n";
+                gpuTime = std::min(gpuTime, SequenceAlignment::alignSequenceGPU(request, &response));
+
+            gpuTime = std::max(uint64_t(1), gpuTime);
+            std::cout << "GPU = " << (gpuTime / 1000) << " ms\n"
+                      << "MCUPS: " << ((numRows * numCols) / gpuTime) << "\n\n";
         }
 
-        std::cout << "GPU Speedup = " << (double(totalTimeCPU)/double(totalTimeGPU)) << "\n";
+        std::cout << "GPU Speedup = " << (double(cpuTime)/double(gpuTime)) << "\n";
 
         delete [] M;
     }
 }
 
 
-void benchmarkBatch (bool cpu, bool gpu, bool isGlobal, int nBatches)
+void benchmarkBatch (bool cpu, bool gpu, bool isGlobal, uint64_t nBatches)
 {
     std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizes =
     {
         std::make_pair(512, 512),
         std::make_pair(1024, 1024),
-        std::make_pair(2048, 2048),
+        std::make_pair(1024*2, 1024*2),
+        std::make_pair(1024*4, 1024*4),
+        std::make_pair(1024*8, 1024*8),
     };
 
     auto alignType = isGlobal ? "Global" : "Local";
@@ -195,33 +207,41 @@ void benchmarkBatch (bool cpu, bool gpu, bool isGlobal, int nBatches)
                                                  : SequenceAlignment::programArgs::LOCAL;
         }
 
-        int totalTimeCPU = 0;
+        struct timeval t1, t2, res;
+
+        uint64_t cpuTime = UINT64_MAX;
         if (cpu)
         {
-            auto begin = std::chrono::steady_clock::now();
+            gettimeofday(&t1, 0);
             for (int i=0; i<nBatches; ++i)
                 alignSequenceCPU(requests[i], &responsesCPU[i]);
+            gettimeofday(&t2, 0);
 
-            auto end = std::chrono::steady_clock::now();
-            totalTimeCPU += std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
-            std::cout << "CPU = " << (totalTimeCPU / 1000) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols * nBatches) / totalTimeCPU) << "\n\n";
+            timersub(&t2, &t1, &res);
+            cpuTime = std::min(cpuTime, 1000000 * uint64_t(res.tv_sec) + uint64_t(res.tv_usec));
+            cpuTime = std::max(uint64_t(1), cpuTime);
+            // we measure in microseconds (1e6) - no more conversion needed for MCUPS
+            std::cout << "CPU = " << (cpuTime / 1000) << " ms\n" // display in ms
+                      << "MCUPS: " << ((numRows * numCols * nBatches) / cpuTime) << "\n\n";
         }
 
-        int totalTimeGPU = 0;
+        uint64_t gpuTime = UINT64_MAX;
         if (gpu)
         {
-            auto begin = std::chrono::steady_clock::now();
+            gettimeofday(&t1, 0);
             for (int i=0; i<nBatches; ++i)
-                SequenceAlignment::alignSequenceGPU(requests[i], &responsesGPU[i]);
+                alignSequenceGPU(requests[i], &responsesGPU[i]);
+            gettimeofday(&t2, 0);
 
-            auto end = std::chrono::steady_clock::now();
-            totalTimeGPU += std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
-            std::cout << "GPU = " << (totalTimeGPU / 1000) << " ms\n"
-                      << "MCUPS: " << int((numRows * numCols * nBatches) / totalTimeGPU) << "\n\n";
+            timersub(&t2, &t1, &res);
+            gpuTime = std::min(gpuTime, 1000000 * uint64_t(res.tv_sec) + uint64_t(res.tv_usec));
+            gpuTime = std::max(uint64_t(1), gpuTime);
+            // we measure in microseconds (1e6) - no more conversion needed for MCUPS
+            std::cout << "GPU = " << (gpuTime / 1000) << " ms\n" // display in ms
+                      << "MCUPS: " << ((numRows * numCols * nBatches) / gpuTime) << "\n\n";
         }
 
-        std::cout << "GPU Speedup = " << (double(totalTimeCPU)/double(totalTimeGPU)) << "\n";
+        std::cout << "GPU Speedup = " << (double(cpuTime)/double(gpuTime)) << "\n";
     }
 }
 
