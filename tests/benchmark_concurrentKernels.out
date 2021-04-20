@@ -1,0 +1,116 @@
+Benchmark investigating the speedup of using multiple concurrent kernels (streams)
+
+Benchmark on GPU: Tesla V100-PCIE-16GB
+Global alignment benchmark
+
+------- 1 stream:
+-----  32768 x 32768  -----
+GPU = 2168 ms
+MCUPS: 495
+
+-----  65472 x 65472  -----
+GPU = 8797 ms
+MCUPS: 487
+
+-----  81920 x 81920  -----
+GPU = 14697 ms
+MCUPS: 456
+
+
+------- 2 streams:
+-----  32768 x 32768  -----
+GPU = 1078 ms
+MCUPS: 995
+
+-----  65472 x 65472  -----
+GPU = 4398 ms
+MCUPS: 974
+
+-----  81920 x 81920  -----
+GPU = 7336 ms
+MCUPS: 914
+
+
+------- 4 streams:
+-----  32768 x 32768  -----
+GPU = 533 ms
+MCUPS: 2013
+
+-----  65472 x 65472  -----
+GPU = 2219 ms
+MCUPS: 1930
+
+-----  81920 x 81920  -----
+GPU = 3653 ms
+MCUPS: 1836
+
+
+------- 8 streams:
+-----  32768 x 32768  -----
+GPU = 280 ms
+MCUPS: 3824
+
+-----  65472 x 65472  -----
+GPU = 1140 ms
+MCUPS: 3758
+
+-----  81920 x 81920  -----
+GPU = 1870 ms
+MCUPS: 3587
+
+
+------- 16 streams:
+-----  32768 x 32768  -----
+GPU = 165 ms
+MCUPS: 6481
+
+-----  65472 x 65472  -----
+GPU = 666 ms
+MCUPS: 6431
+
+-----  81920 x 81920  -----
+GPU = 1049 ms
+MCUPS: 6396
+
+
+------- 32 streams:
+-----  32768 x 32768  -----
+GPU = 137 ms
+MCUPS: 7789
+
+-----  65472 x 65472  -----
+GPU = 537 ms
+MCUPS: 7974
+
+-----  81920 x 81920  -----
+GPU = 871 ms
+MCUPS: 7698
+
+
+------- 36 streams:
+-----  32768 x 32768  -----
+GPU = 132 ms
+MCUPS: 8078
+
+-----  65472 x 65472  -----
+GPU = 625 ms
+MCUPS: 6858
+
+-----  81920 x 81920  -----
+GPU = 863 ms
+MCUPS: 7771
+
+
+------- 64 streams:
+-----  32768 x 32768  -----
+GPU = 137 ms
+MCUPS: 7828
+
+-----  65472 x 65472  -----
+GPU = 1044 ms
+MCUPS: 4105
+
+-----  81920 x 81920  -----
+GPU = 2046 ms
+MCUPS: 3278
+
