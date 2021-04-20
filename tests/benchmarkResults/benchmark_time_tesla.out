@@ -1,0 +1,122 @@
+Benchmark on GPU: Tesla V100-SXM2-16GB
+
+Global alignment batch (1x) benchmark:
+-----  512 x 512  -----
+GPU = 4 ms
+MCUPS: 61
+
+-----  1024 x 1024  -----
+GPU = 5 ms
+MCUPS: 196
+
+-----  4096 x 4096  -----
+GPU = 41 ms
+MCUPS: 400
+
+-----  8192 x 8192  -----
+GPU = 81 ms
+MCUPS: 821
+
+-----  16384 x 16384  -----
+GPU = 250 ms
+MCUPS: 1069
+
+-----  32768 x 32768  -----
+GPU = 889 ms
+MCUPS: 1207
+
+-----  65536 x 65536  -----
+GPU = 3509 ms
+MCUPS: 1223
+
+
+Local alignment batch (1x) benchmark:
+-----  512 x 32768  -----
+GPU = 39 ms
+MCUPS: 420
+
+-----  1024 x 32768  -----
+GPU = 76 ms
+MCUPS: 440
+
+-----  2048 x 32768  -----
+GPU = 110 ms
+MCUPS: 606
+
+-----  4096 x 32768  -----
+GPU = 162 ms
+MCUPS: 828
+
+-----  8192 x 32768  -----
+GPU = 267 ms
+MCUPS: 1005
+
+-----  16384 x 32768  -----
+GPU = 475 ms
+MCUPS: 1128
+
+-----  32768 x 32768  -----
+GPU = 898 ms
+MCUPS: 1194
+
+
+Global alignment batch (500x) benchmark:
+-----  512 x 512  -----
+GPU = 1028 ms
+MCUPS: 127
+
+-----  1024 x 1024  -----
+GPU = 1658 ms
+MCUPS: 316
+
+-----  4096 x 4096  -----
+GPU = 13227 ms
+MCUPS: 634
+
+-----  8192 x 8192  -----
+GPU = 38468 ms
+MCUPS: 872
+
+-----  16384 x 16384  -----
+GPU = 124422 ms
+MCUPS: 1078
+
+-----  32768 x 32768  -----
+GPU = 459769 ms
+MCUPS: 1167
+
+-----  65536 x 65536  -----
+GPU = 1753638 ms
+MCUPS: 1224
+
+
+Local alignment batch (500x) benchmark:
+-----  512 x 32768  -----
+GPU = 19927 ms
+MCUPS: 420
+
+-----  1024 x 32768  -----
+GPU = 38669 ms
+MCUPS: 433
+
+-----  2048 x 32768  -----
+GPU = 57145 ms
+MCUPS: 587
+
+-----  4096 x 32768  -----
+GPU = 86102 ms
+MCUPS: 779
+
+-----  8192 x 32768  -----
+GPU = 142143 ms
+MCUPS: 944
+
+-----  16384 x 32768  -----
+GPU = 254271 ms
+MCUPS: 1055
+
+-----  32768 x 32768  -----
+GPU = 475056 ms
+MCUPS: 1130
+
+-------

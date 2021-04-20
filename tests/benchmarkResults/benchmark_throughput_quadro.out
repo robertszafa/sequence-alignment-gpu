@@ -1,0 +1,60 @@
+Benchmark on GPU: Quadro P4000
+
+Global alignment benchmark:
+-----  512 x 512  -----
+GPU = 0 ms
+MCUPS: 373
+
+-----  1024 x 1024  -----
+GPU = 2 ms
+MCUPS: 472
+
+-----  4096 x 4096  -----
+GPU = 7 ms
+MCUPS: 2279
+
+-----  8192 x 8192  -----
+GPU = 22 ms
+MCUPS: 2933
+
+-----  16384 x 16384  -----
+GPU = 93 ms
+MCUPS: 2868
+
+-----  32768 x 32768  -----
+GPU = 578 ms
+MCUPS: 1854
+
+-----  65536 x 65536  -----
+GPU = 2363 ms
+MCUPS: 1817
+
+
+Local alignment benchmark:
+-----  512 x 32768  -----
+GPU = 28 ms
+MCUPS: 599
+
+-----  1024 x 32768  -----
+GPU = 49 ms
+MCUPS: 677
+
+-----  2048 x 32768  -----
+GPU = 49 ms
+MCUPS: 1353
+
+-----  4096 x 32768  -----
+GPU = 49 ms
+MCUPS: 2710
+
+-----  8192 x 32768  -----
+GPU = 76 ms
+MCUPS: 3499
+
+-----  16384 x 32768  -----
+GPU = 255 ms
+MCUPS: 2097
+
+-----  32768 x 32768  -----
+GPU = 580 ms
+MCUPS: 1850
