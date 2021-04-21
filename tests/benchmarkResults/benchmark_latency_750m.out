@@ -1,0 +1,61 @@
+Benchmark on GPU: GeForce GT 750M
+
+Global alignment latency (end-to-end) benchmark:
+-----  512 x 512  -----
+CPU = 6 ms
+GPU = 3 ms
+GPU Speedup = 1.97679
+-----  1024 x 1024  -----
+CPU = 25 ms
+GPU = 7 ms
+GPU Speedup = 3.58555
+-----  4096 x 4096  -----
+CPU = 407 ms
+GPU = 91 ms
+GPU Speedup = 4.46751
+-----  8192 x 8192  -----
+CPU = 1647 ms
+GPU = 249 ms
+GPU Speedup = 6.61479
+-----  16384 x 16384  -----
+CPU = 6552 ms
+GPU = 906 ms
+GPU Speedup = 7.22438
+-----  32768 x 32768  -----
+CPU = 26243 ms
+GPU = 3642 ms
+GPU Speedup = 7.20457
+-----  65536 x 65536  -----
+CPU = 104287 ms
+GPU = 14491 ms
+GPU Speedup = 7.19633
+
+Local alignment latency (end-to-end) benchmark:
+-----  512 x 32768  -----
+CPU = 597 ms
+GPU = 70 ms
+GPU Speedup = 8.53152
+-----  1024 x 32768  -----
+CPU = 1188 ms
+GPU = 125 ms
+GPU Speedup = 9.47778
+-----  2048 x 32768  -----
+CPU = 2381 ms
+GPU = 223 ms
+GPU Speedup = 10.677
+-----  4096 x 32768  -----
+CPU = 4832 ms
+GPU = 453 ms
+GPU Speedup = 10.6582
+-----  8192 x 32768  -----
+CPU = 9660 ms
+GPU = 909 ms
+GPU Speedup = 10.6262
+-----  16384 x 32768  -----
+CPU = 19271 ms
+GPU = 1826 ms
+GPU Speedup = 10.5499
+-----  32768 x 32768  -----
+CPU = 38493 ms
+GPU = 3641 ms
+GPU Speedup = 10.5717

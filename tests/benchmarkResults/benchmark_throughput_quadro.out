@@ -9,6 +9,10 @@ MCUPS: 373
 GPU = 2 ms
 MCUPS: 472
 
+-----  2048 x 2048  -----
+GPU = 4 ms
+MCUPS: 912
+
 -----  4096 x 4096  -----
 GPU = 7 ms
 MCUPS: 2279

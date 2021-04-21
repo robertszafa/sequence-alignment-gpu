@@ -1,0 +1,37 @@
+Benchmark on GPU: GeForce GT 750M
+
+Global alignment batch (1x) benchmark:
+-----  8192 x 8192  -----
+CPU = 1593 ms
+GPU = 322 ms
+GPU Speedup = 4.9351
+
+Global alignment batch (2x) benchmark:
+-----  8192 x 8192  -----
+CPU = 3275 ms
+GPU = 555 ms
+GPU Speedup = 5.89612
+
+Global alignment batch (4x) benchmark:
+-----  8192 x 8192  -----
+CPU = 6316 ms
+GPU = 973 ms
+GPU Speedup = 6.49072
+
+Global alignment batch (8x) benchmark:
+-----  8192 x 8192  -----
+CPU = 12633 ms
+GPU = 1895 ms
+GPU Speedup = 6.66448
+
+Global alignment batch (16x) benchmark:
+-----  8192 x 8192  -----
+CPU = 25333 ms
+GPU = 3615 ms
+GPU Speedup = 7.00786
+
+Global alignment batch (32x) benchmark:
+-----  8192 x 8192  -----
+CPU = 50662 ms
+GPU = 7205 ms
+GPU Speedup = 7.03118

@@ -1,0 +1,47 @@
+Benchmark on GPU: Quadro P4000
+
+Global alignment latency (end-to-end) benchmark:
+-----  512 x 512  -----
+GPU = 3 ms
+
+-----  1024 x 1024  -----
+GPU = 5 ms
+
+-----  4096 x 4096  -----
+GPU = 30 ms
+
+-----  8192 x 8192  -----
+GPU = 75 ms
+
+-----  16384 x 16384  -----
+GPU = 299 ms
+
+-----  32768 x 32768  -----
+GPU = 1412 ms
+
+-----  65536 x 65536  -----
+GPU = 5476 ms
+
+
+Local alignment latency (end-to-end) benchmark:
+-----  512 x 32768  -----
+GPU = 38 ms
+
+-----  1024 x 32768  -----
+GPU = 69 ms
+
+-----  2048 x 32768  -----
+GPU = 108 ms
+
+-----  4096 x 32768  -----
+GPU = 164 ms
+
+-----  8192 x 32768  -----
+GPU = 279 ms
+
+-----  16384 x 32768  -----
+GPU = 678 ms
+
+-----  32768 x 32768  -----
+GPU = 1356 ms
+

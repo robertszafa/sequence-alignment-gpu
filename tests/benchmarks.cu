@@ -1,7 +1,7 @@
 // Comment out to use time/latency benchmark, instead of throughput benchmark.
 #define BENCHMARK
 
-/// Best-out-of-N time is picked
+/// Best-out-of-N time is picked when measuring latency & throughput.
 #define NUM_REPEATS 5
 
 #include <iostream>
@@ -41,6 +41,15 @@ void fillDummyRequest(SequenceAlignment::Request &request, const uint64_t numRow
                          request.alphabetSize, request.scoreMatrix);
 }
 
+/// Return time interval between 2 Unix timestamps in microseconds.
+uint64_t getTime(timeval &t1, timeval &t2)
+{
+    timeval res;
+    timersub(&t2, &t1, &res);
+
+    // Microseconds is 1e-6th of a second.
+    return 1000000 * uint64_t(res.tv_sec) + uint64_t(res.tv_usec);
+}
 
 /// Show the speedup from having the GPU wavefront on the diagonal axis of the M matrix,
 /// compared to on the horizontal axis.
@@ -96,6 +105,7 @@ void benchmarkFillMatrixThroughput(const bool cpu, const bool gpu, const program
     {
         std::make_pair(512, 512),
         std::make_pair(1024, 1024),
+        std::make_pair(1024*2, 1024*2),
         std::make_pair(1024*4, 1024*4),
         std::make_pair(1024*8, 1024*8),
         std::make_pair(1024*16, 1024*16),
@@ -129,7 +139,7 @@ void benchmarkFillMatrixThroughput(const bool cpu, const bool gpu, const program
         fillDummyRequest(request, numRows, numCols, alignType);
         char *M = new char[numRows * numCols];
 
-        struct timeval t1, t2, res;
+        struct timeval t1, t2;
 
         uint64_t cpuTime = UINT64_MAX;
         if (cpu)
@@ -143,8 +153,7 @@ void benchmarkFillMatrixThroughput(const bool cpu, const bool gpu, const program
 
                 gettimeofday(&t2, 0);
 
-                timersub(&t2, &t1, &res);
-                cpuTime = std::min(cpuTime, 1000000 * uint64_t(res.tv_sec) + uint64_t(res.tv_usec));
+                cpuTime = std::min(cpuTime, getTime(t1, t2));
             }
 
             // Ensure we don't divide by 0.
@@ -168,7 +177,8 @@ void benchmarkFillMatrixThroughput(const bool cpu, const bool gpu, const program
                       << "MCUPS: " << ((numRows * numCols) / gpuTime) << "\n\n";
         }
 
-        std::cout << "GPU Speedup = " << (double(cpuTime) / double(gpuTime)) << "\n";
+        if (gpu && cpu)
+            std::cout << "GPU Speedup = " << (double(cpuTime) / double(gpuTime)) << "\n";
 
         delete [] M;
     }
@@ -176,7 +186,7 @@ void benchmarkFillMatrixThroughput(const bool cpu, const bool gpu, const program
 
 
 /// Measure the time to process nBatches requests in sequence (end-to-end).
-void benchmarkEndToEndTime (const bool cpu, const bool gpu, const programArgs alignType, const uint64_t nBatches)
+void benchmarkEndToEndLatency (const bool cpu, const bool gpu, const programArgs alignType, const uint64_t nBatches)
 {
     const std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizesNW =
     {
@@ -186,6 +196,7 @@ void benchmarkEndToEndTime (const bool cpu, const bool gpu, const programArgs al
         std::make_pair(1024*8, 1024*8),
         std::make_pair(1024*16, 1024*16),
         std::make_pair(1024*32, 1024*32),
+        std::make_pair(1024*64, 1024*64),
     };
     const std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizesSW =
     {
@@ -199,6 +210,69 @@ void benchmarkEndToEndTime (const bool cpu, const bool gpu, const programArgs al
     };
 
     const auto benchmarkSizes = (alignType == programArgs::GLOBAL) ? benchmarkSizesNW : benchmarkSizesSW;
+    std::string alignTypeStr = (alignType == programArgs::GLOBAL) ? "Global" : "Local";
+
+    std::cout << "\n" << alignTypeStr << " alignment latency (end-to-end) benchmark:\n";
+
+    for (const auto &sizePair : benchmarkSizes)
+    {
+        uint64_t numRows = sizePair.first;
+        uint64_t numCols = sizePair.second;
+        std::cout << "-----  " << numRows << " x " << numCols << "  -----\n";
+
+        SequenceAlignment::Request request;
+        SequenceAlignment::Response response;
+        fillDummyRequest(request, numRows, numCols, alignType);
+
+        struct timeval t1, t2;
+
+        uint64_t cpuTime = UINT64_MAX;
+        if (cpu)
+        {
+            for (int i=0; i<NUM_REPEATS; ++i)
+            {
+                gettimeofday(&t1, 0);
+                alignSequenceCPU(request, &response);
+                gettimeofday(&t2, 0);
+
+                cpuTime = std::min(cpuTime, getTime(t1, t2));
+            }
+
+            // we measure in microseconds (1e6) - no more conversion needed for MCUPS
+            std::cout << "CPU = " << (cpuTime / 1000) << " ms\n";
+        }
+
+        uint64_t gpuTime = UINT64_MAX;
+        if (gpu)
+        {
+            for (int i=0; i<NUM_REPEATS; ++i)
+            {
+                gettimeofday(&t1, 0);
+                alignSequenceGPU(request, &response);
+                gettimeofday(&t2, 0);
+
+                gpuTime = std::min(gpuTime, getTime(t1, t2));
+            }
+
+            // we measure in microseconds (1e6) - no more conversion needed for MCUPS
+            std::cout << "GPU = " << (gpuTime / 1000) << " ms\n";
+        }
+
+        if (gpu && cpu)
+            std::cout << "GPU Speedup = " << (double(cpuTime)/double(gpuTime)) << "\n";
+    }
+}
+
+/// Measure the time to process nBatches requests in sequence (end-to-end).
+void benchmarkEndToEndBatch (const bool cpu, const bool gpu, const programArgs alignType, const uint64_t nBatches)
+{
+    // In this benchmark, we fix the sequence size and measure how the GPU speedup
+    // behaves as the batch size grows.
+    const std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizes =
+    {
+        std::make_pair(1024*8, 1024*8),
+    };
+
     std::string alignTypeStr = (alignType == programArgs::GLOBAL) ? "Global" : "Local";
 
     std::cout << "\n" << alignTypeStr << " alignment batch (" << nBatches << "x) benchmark:\n";
@@ -215,7 +289,7 @@ void benchmarkEndToEndTime (const bool cpu, const bool gpu, const programArgs al
         for (int i=0; i < nBatches; ++i)
             fillDummyRequest(requests[i], numRows, numCols, alignType);
 
-        struct timeval t1, t2, res;
+        struct timeval t1, t2;
 
         uint64_t cpuTime = 0;
         if (cpu)
@@ -228,12 +302,9 @@ void benchmarkEndToEndTime (const bool cpu, const bool gpu, const programArgs al
                 alignSequenceCPU(requests[i], &responsesCPU[i]);
             gettimeofday(&t2, 0);
 
-            timersub(&t2, &t1, &res);
-            cpuTime = 1000000 * uint64_t(res.tv_sec) + uint64_t(res.tv_usec);
-
+            cpuTime = getTime(t1, t2);
             // we measure in microseconds (1e6) - no more conversion needed for MCUPS
-            std::cout << "CPU = " << (cpuTime / 1000) << " ms\n"
-                      << "MCUPS: " << ((numRows * numCols * nBatches) / cpuTime) << "\n\n";
+            std::cout << "CPU = " << (cpuTime / 1000) << " ms\n";
         }
 
         uint64_t gpuTime = 0;
@@ -247,16 +318,15 @@ void benchmarkEndToEndTime (const bool cpu, const bool gpu, const programArgs al
                 alignSequenceGPU(requests[i], &responsesGPU[i]);
             gettimeofday(&t2, 0);
 
-            timersub(&t2, &t1, &res);
-            gpuTime = 1000000 * uint64_t(res.tv_sec) + uint64_t(res.tv_usec);
-
-            std::cout << "GPU = " << (gpuTime / 1000) << " ms\n"
-                      << "MCUPS: " << ((numRows * numCols * nBatches) / gpuTime) << "\n\n";
+            gpuTime = getTime(t1, t2);
+            std::cout << "GPU = " << (gpuTime / 1000) << " ms\n";
         }
 
-        std::cout << "GPU Speedup = " << (double(cpuTime)/double(gpuTime)) << "\n";
+        if (gpu && cpu)
+            std::cout << "GPU Speedup = " << (double(cpuTime)/double(gpuTime)) << "\n";
     }
 }
+
 
 
 int main(int argc, const char *argv[])
@@ -276,14 +346,18 @@ int main(int argc, const char *argv[])
     // For rest, make sure BENCHMARK is not defined.
     #ifndef BENCHMARK
         // Measure latency of 1 alignment.
-        benchmarkEndToEndTime(true, true, programArgs::GLOBAL, 1);
-        benchmarkEndToEndTime(true, true, programArgs::LOCAL, 1);
+        benchmarkEndToEndLatency(true, true, programArgs::GLOBAL, 1);
+        benchmarkEndToEndLatency(true, true, programArgs::LOCAL, 1);
 
-        // Measure timeto do N alignments.
+        // Measure time to do N alignments.
         // In the batch we measure the execution time of the whole system
         // when multiple sequences are aligned in quick succession.
-        benchmarkEndToEndTime(true, true, programArgs::GLOBAL, 500);
-        benchmarkEndToEndTime(true, true, programArgs::LOCAL, 500);
+        benchmarkEndToEndBatch(true, true, programArgs::GLOBAL, 1);
+        benchmarkEndToEndBatch(true, true, programArgs::GLOBAL, 2);
+        benchmarkEndToEndBatch(true, true, programArgs::GLOBAL, 4);
+        benchmarkEndToEndBatch(true, true, programArgs::GLOBAL, 8);
+        benchmarkEndToEndBatch(true, true, programArgs::GLOBAL, 16);
+        benchmarkEndToEndBatch(true, true, programArgs::GLOBAL, 32);
     #endif
 
     return 0;
