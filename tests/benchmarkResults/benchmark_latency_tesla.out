@@ -1,48 +1,37 @@
 Benchmark on GPU: Tesla V100-PCIE-16GB
 
 Global alignment latency (end-to-end) benchmark:
+-----  256 x 256  -----
+GPU = 3 ms
 -----  512 x 512  -----
 GPU = 3 ms
-
 -----  1024 x 1024  -----
 GPU = 4 ms
-
 -----  4096 x 4096  -----
-GPU = 29 ms
-
+GPU = 23 ms
 -----  8192 x 8192  -----
-GPU = 82 ms
-
+GPU = 67 ms
 -----  16384 x 16384  -----
-GPU = 263 ms
-
+GPU = 317 ms
 -----  32768 x 32768  -----
-GPU = 1178 ms
-
+GPU = 1103 ms
 -----  65536 x 65536  -----
-GPU = 4293 ms
-
+GPU = 3702 ms
 
 Local alignment latency (end-to-end) benchmark:
+-----  256 x 32768  -----
+GPU = 26 ms
 -----  512 x 32768  -----
-GPU = 44 ms
-
+GPU = 34 ms
 -----  1024 x 32768  -----
-GPU = 87 ms
-
+GPU = 49 ms
 -----  2048 x 32768  -----
-GPU = 134 ms
-
+GPU = 99 ms
 -----  4096 x 32768  -----
-GPU = 208 ms
-
+GPU = 146 ms
 -----  8192 x 32768  -----
-GPU = 286 ms
-
+GPU = 251 ms
 -----  16384 x 32768  -----
-GPU = 493 ms
-
+GPU = 467 ms
 -----  32768 x 32768  -----
-GPU = 1016 ms
-
--------
+GPU = 1046 ms

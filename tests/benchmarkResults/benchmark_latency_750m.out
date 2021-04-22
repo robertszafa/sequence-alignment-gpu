@@ -1,14 +1,18 @@
 Benchmark on GPU: GeForce GT 750M
 
 Global alignment latency (end-to-end) benchmark:
+-----  256 x 256  -----
+CPU = 1 ms
+GPU = 2 ms
+GPU Speedup = 0.52147
 -----  512 x 512  -----
 CPU = 6 ms
-GPU = 3 ms
-GPU Speedup = 1.97679
+GPU = 5 ms
+GPU Speedup = 1.18019
 -----  1024 x 1024  -----
-CPU = 25 ms
-GPU = 7 ms
-GPU Speedup = 3.58555
+CPU = 24 ms
+GPU = 11 ms
+GPU Speedup = 2.215175
 -----  4096 x 4096  -----
 CPU = 407 ms
 GPU = 91 ms
@@ -31,14 +35,18 @@ GPU = 14491 ms
 GPU Speedup = 7.19633
 
 Local alignment latency (end-to-end) benchmark:
+-----  256 x 32768  -----
+CPU = 285 ms
+GPU = 101 ms
+GPU Speedup = 2.8214
 -----  512 x 32768  -----
-CPU = 597 ms
-GPU = 70 ms
-GPU Speedup = 8.53152
+CPU = 569 ms
+GPU = 96 ms
+GPU Speedup = 5.93606
 -----  1024 x 32768  -----
-CPU = 1188 ms
-GPU = 125 ms
-GPU Speedup = 9.47778
+CPU = 1147 ms
+GPU = 110 ms
+GPU Speedup = 10.42
 -----  2048 x 32768  -----
 CPU = 2381 ms
 GPU = 223 ms

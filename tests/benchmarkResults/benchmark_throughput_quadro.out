@@ -1,33 +1,37 @@
 Benchmark on GPU: Quadro P4000
 
 Global alignment benchmark:
+-----  256 x 256  -----
+GPU = 0 ms
+MCUPS: 163
+
 -----  512 x 512  -----
 GPU = 0 ms
-MCUPS: 373
+MCUPS: 277
 
 -----  1024 x 1024  -----
 GPU = 2 ms
-MCUPS: 472
+MCUPS: 515
 
 -----  2048 x 2048  -----
 GPU = 4 ms
-MCUPS: 912
+MCUPS: 974
 
 -----  4096 x 4096  -----
-GPU = 7 ms
-MCUPS: 2279
+GPU = 10 ms
+MCUPS: 1576
 
 -----  8192 x 8192  -----
-GPU = 22 ms
-MCUPS: 2933
+GPU = 23 ms
+MCUPS: 2802
 
 -----  16384 x 16384  -----
-GPU = 93 ms
-MCUPS: 2868
+GPU = 100 ms
+MCUPS: 2671
 
 -----  32768 x 32768  -----
-GPU = 578 ms
-MCUPS: 1854
+GPU = 595 ms
+MCUPS: 1804
 
 -----  65536 x 65536  -----
 GPU = 2363 ms
@@ -35,30 +39,35 @@ MCUPS: 1817
 
 
 Local alignment benchmark:
+-----  256 x 32768  -----
+GPU = 25 ms
+MCUPS: 324
+
 -----  512 x 32768  -----
-GPU = 28 ms
-MCUPS: 599
+GPU = 26 ms
+MCUPS: 630
 
 -----  1024 x 32768  -----
-GPU = 49 ms
-MCUPS: 677
+GPU = 27 ms
+MCUPS: 1226
 
 -----  2048 x 32768  -----
-GPU = 49 ms
-MCUPS: 1353
+GPU = 31 ms
+MCUPS: 2138
 
 -----  4096 x 32768  -----
-GPU = 49 ms
-MCUPS: 2710
+GPU = 41 ms
+MCUPS: 3252
 
 -----  8192 x 32768  -----
-GPU = 76 ms
-MCUPS: 3499
+GPU = 59 ms
+MCUPS: 4487
 
 -----  16384 x 32768  -----
-GPU = 255 ms
-MCUPS: 2097
+GPU = 286 ms
+MCUPS: 1873
 
 -----  32768 x 32768  -----
-GPU = 580 ms
-MCUPS: 1850
+GPU = 588 ms
+MCUPS: 1825
+

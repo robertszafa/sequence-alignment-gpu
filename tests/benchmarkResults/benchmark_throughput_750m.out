@@ -1,20 +1,28 @@
 Benchmark on GPU: GeForce GT 750M
 
 Global alignment benchmark:
------  512 x 512  -----
-CPU = 6 ms
-MCUPS: 43
+-----  256 x 256  -----
+CPU = 1 ms
+MCUPS: 41
 
 GPU = 3 ms
-MCUPS: 69
+MCUPS: 17
 
-GPU Speedup = 1.58934
+GPU Speedup = 0.407504
+-----  512 x 512  -----
+CPU = 6 ms
+MCUPS: 38
+
+GPU = 2 ms
+MCUPS: 92
+
+GPU Speedup = 2.4262
 -----  1024 x 1024  -----
-CPU = 24 ms
-MCUPS: 43
+CPU = 25 ms
+MCUPS: 40
 
-GPU = 8 ms
-MCUPS: 123
+GPU = 6 ms
+MCUPS: 160
 
 GPU Speedup = 2.85026
 -----  2048 x 2048  -----

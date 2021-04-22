@@ -2,7 +2,11 @@
 
 #include "SequenceAlignment.hpp"
 
+/// Kepler limit.
 #define MAX_THREADS_PER_BLOCK 1024
+/// On Kepler, the warp scheduler has 4 active warps at a time (+2 in-flight).
+#define MIN_THREADS_PER_BLOCK 128
+/// According to experiments on Tesla V100 16GB, throughput drops once going beyond 32 kernels.
 #define MAX_CONCURRENT_KERNELS 32
 
 using SequenceAlignment::DIRECTION;
@@ -352,13 +356,14 @@ __global__ void cuda_fillMatrixSW(const char* __restrict__ textBytes,
 /// Allocate memory and initialise all data structures used in the NW, SW GPU algorithms.
 /// Some buffers are replicated per CUDA stream - those are passed in as vectors of pointers.
 ///
-/// Return the number of possible threads per block, given the size of text and pattern sequences.
-/// Return 0 if not enough memory to create the minimum sized kernel of 32 x numCols.
-uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment::Response *response,
-                    char *&d_textBytes, char *&d_patternBytes, int *&d_scoreMatrix,
-                    columnState *&d_columnState, std::vector<char*> &d_M, std::vector<int*> &d_maxScore,
-                    std::vector<int*> &d_maxScoreIdx, char *&h_M, int *&h_maxScores,
-                    int *&h_maxScoreIdxs, cudaStream_t &cuStream, const int numCuStreams)
+/// Return the number of possible threads per block and the number of kernel invocations needed,
+//  given the size of text and pattern sequences.
+/// Return <0,0> if not enough memory to create the minimum sized kernel.
+std::pair<uint64_t, uint64_t>
+initMemory(const SequenceAlignment::Request &request, SequenceAlignment::Response *response,
+           char *&d_textBytes, char *&d_patternBytes, int *&d_scoreMatrix, columnState *&d_columnState,
+           std::vector<char*> &d_M, std::vector<int*> &d_maxScore, std::vector<int*> &d_maxScoreIdx,
+           char *&h_M, int *&h_maxScores, int *&h_maxScoreIdxs, cudaStream_t &cuStream, const int numCuStreams)
 {
     const uint64_t numCols = request.textNumBytes + 1;
     const uint64_t numRows = request.patternNumBytes + 1;
@@ -373,17 +378,21 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
                sizeof(int) * numCuStreams * 2;                         // bestScore + bestScoreIdx per stream
     };
 
-    uint64_t numThreads = MAX_THREADS_PER_BLOCK;
+    // Equally divide rows per Concurrent kernel, ensuring each block has a number of threads between:
+    //      MIN_THREADS_PER_BLOCK <= numThreads <= MAX_THREADS_PER_BLOCK
+    uint64_t numThreads = std::min(MAX_THREADS_PER_BLOCK,
+                                   std::max(MIN_THREADS_PER_BLOCK,
+                                            int((numRows + numCuStreams - 1) / numCuStreams)));
     uint64_t freeGlobalMem = 0;
     cudaMemGetInfo((size_t*) &freeGlobalMem, 0);
     while (freeGlobalMem < calcGlobalMem(numThreads))
     {
         numThreads -= 32;
-        if (numThreads < 32)
-            return 0;
+        if (numThreads < MIN_THREADS_PER_BLOCK)
+            return {0, 0};
     }
     // How many GPU kernels will be started?
-    const auto numKernels = numRows/numThreads + 1;
+    const auto numKernels = (numRows + numThreads - 1) / numThreads;
 
     // Start allocating memory
 
@@ -395,7 +404,7 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
     }
     catch(const std::bad_alloc& e)
     {
-        return 0;
+        return {0, 0};
     }
 
     // Streams transfer their filled out M matrix portions to pinned memory. This allows the DMA
@@ -408,7 +417,7 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
         cudaMallocHost(&(h_maxScores), numKernels * sizeof(int)) != cudaSuccess ||
         cudaMallocHost(&(h_maxScoreIdxs), numKernels * sizeof(int)) != cudaSuccess)
     {
-        return 0;
+        return {0, 0};
     }
     /** End Host Memory */
 
@@ -420,7 +429,7 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
         cudaMalloc(&d_patternBytes, request.patternNumBytes) != cudaSuccess ||
         cudaMalloc(&d_columnState, numCols * sizeof(columnState)) != cudaSuccess)
     {
-        return 0;
+        return {0, 0};
     }
 
     // One per stream.
@@ -430,7 +439,7 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
             cudaMalloc(&(d_maxScore[i]), sizeof(int)) != cudaSuccess ||
             cudaMalloc(&(d_maxScoreIdx[i]), sizeof(int)) != cudaSuccess)
         {
-            return 0;
+            return {0, 0};
         }
     }
 
@@ -441,14 +450,14 @@ uint64_t initMemory(const SequenceAlignment::Request &request, SequenceAlignment
         cudaMemcpyAsync(d_patternBytes, request.patternBytes, request.patternNumBytes, cudaMemcpyHostToDevice, cuStream) != cudaSuccess ||
         cudaMemcpyAsync(d_scoreMatrix, request.scoreMatrix, sizeof(int) * (request.alphabetSize * request.alphabetSize), cudaMemcpyHostToDevice, cuStream) != cudaSuccess)
     {
-        return 0;
+        return {0, 0};
     }
     /** End Device Memory */
 
     // Wait for all mem ops to finish before releasing control to CPU.
     cudaStreamSynchronize(cuStream);
 
-    return numThreads;
+    return {numThreads, numKernels};
 }
 
 uint64_t SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &request,
@@ -466,13 +475,10 @@ uint64_t SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &r
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
 
-    // Ensure range 1 >= numCuStreams <= MAX_CONCURRENT_KERNELS, with the conditions:
-    //      - one stream per 1024 rows,
-    //      - no more streams than the number of available SMs.
-    const int numCuStreams = std::min(std::max((int) (numRows + 1) / MAX_THREADS_PER_BLOCK, 1),
-                                      std::min(MAX_CONCURRENT_KERNELS, deviceProp.multiProcessorCount));
-    // Will hold the number of kernel invocations required for the input sequences.
-    int numKernels = 0;
+    const auto numStreamsWithMinNumThreads = int((numRows + MIN_THREADS_PER_BLOCK - 1) / MIN_THREADS_PER_BLOCK);
+    const int numCuStreams = std::min(MAX_CONCURRENT_KERNELS, std::min(deviceProp.multiProcessorCount,
+                                                                       numStreamsWithMinNumThreads));
+
     std::vector<cudaStream_t> cuStreams(numCuStreams);
     for (int i=0; i<numCuStreams; ++i)
         cudaStreamCreate(&(cuStreams[i]));
@@ -489,9 +495,9 @@ uint64_t SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &r
     int *d_scoreMatrix = nullptr;
     columnState *d_columnState = nullptr;
     // Private to a stream:
-    std::vector<char*> d_M(numCuStreams);
-    std::vector<int*> d_maxScore(numCuStreams);
-    std::vector<int*> d_maxScoreIdx(numCuStreams);
+    std::vector<char*> d_M(numCuStreams, nullptr);
+    std::vector<int*> d_maxScore(numCuStreams, nullptr);
+    std::vector<int*> d_maxScoreIdx(numCuStreams, nullptr);
 
     // Define how the allocated resources are destroyed.
     auto cleanUp = [&]()
@@ -524,24 +530,26 @@ uint64_t SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &r
         d_columnState = nullptr;
     };
 
-    // Deal with memory, and find out the number of possible threads per block, given the input size.
+    // Deal with memory, and find out the number of possible threads per block, given the input size,
+    // and how many kernel invocations needed with this thread block size.
     // Make the first compute stream deal with memory, to ensure all is ready when it starts
     // (operations are ordered within streams).
-    const uint64_t NUM_THREADS_PER_BLOCK = initMemory(request, response, d_textBytes, d_patternBytes,
-                                                      d_scoreMatrix, d_columnState, d_M, d_maxScore,
-                                                      d_maxScoreIdx, h_M, h_maxScores, h_maxScoreIdxs,
-                                                      currCuStream, numCuStreams);
-    if (NUM_THREADS_PER_BLOCK == 0)
+    const auto numThreadsAndKernels = initMemory(request, response, d_textBytes, d_patternBytes,
+                                                 d_scoreMatrix, d_columnState, d_M, d_maxScore,
+                                                 d_maxScoreIdx, h_M, h_maxScores, h_maxScoreIdxs,
+                                                 currCuStream, numCuStreams);
+    if (numThreadsAndKernels.first == 0)
     {
         std::cout << MEM_ERROR;
         cleanUp();
         return 1;
     }
-    numKernels = (numRows/NUM_THREADS_PER_BLOCK) + 1;
+    const uint64_t numThreadsPerBlock = numThreadsAndKernels.first;
+    const uint64_t numKernels = numThreadsAndKernels.second;
     /** End Allocate and transfer memory */
 
     // Three score buffers and the score matrix are kept in shared memory.
-    const unsigned int sharedMemSize = 3 * std::min(NUM_THREADS_PER_BLOCK, numRows) * sizeof(int) +
+    const unsigned int sharedMemSize = 3 * std::min(numThreadsPerBlock, numRows) * sizeof(int) +
                                        request.alphabetSize * request.alphabetSize * sizeof(int);
 
     #ifdef BENCHMARK
@@ -555,7 +563,7 @@ uint64_t SequenceAlignment::alignSequenceGPU(const SequenceAlignment::Request &r
     auto curr_h_M = h_M + numCols;
     for (int i_kernel=0; i_kernel < numKernels; ++i_kernel)
     {
-        const int numThreads = std::min(NUM_THREADS_PER_BLOCK, numRows - startRow);
+        const int numThreads = std::min(numThreadsPerBlock, numRows - startRow);
         const int endRow = startRow + numThreads - 1;
 
         // Round-robin scheduling for CUDA streams.

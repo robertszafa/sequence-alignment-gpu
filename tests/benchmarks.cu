@@ -103,6 +103,7 @@ void benchmarkFillMatrixThroughput(const bool cpu, const bool gpu, const program
 {
     const std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizesNW =
     {
+        std::make_pair(256, 256),
         std::make_pair(512, 512),
         std::make_pair(1024, 1024),
         std::make_pair(1024*2, 1024*2),
@@ -114,6 +115,7 @@ void benchmarkFillMatrixThroughput(const bool cpu, const bool gpu, const program
     };
     const std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizesSW =
     {
+        std::make_pair(256, 1024*32),
         std::make_pair(512, 1024*32),
         std::make_pair(1024, 1024*32),
         std::make_pair(1024*2, 1024*32),
@@ -190,6 +192,7 @@ void benchmarkEndToEndLatency (const bool cpu, const bool gpu, const programArgs
 {
     const std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizesNW =
     {
+        std::make_pair(256, 256),
         std::make_pair(512, 512),
         std::make_pair(1024, 1024),
         std::make_pair(1024*4, 1024*4),
@@ -200,6 +203,7 @@ void benchmarkEndToEndLatency (const bool cpu, const bool gpu, const programArgs
     };
     const std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizesSW =
     {
+        std::make_pair(256, 1024*32),
         std::make_pair(512, 1024*32),
         std::make_pair(1024, 1024*32),
         std::make_pair(1024*2, 1024*32),
@@ -343,7 +347,7 @@ int main(int argc, const char *argv[])
         benchmarkFillMatrixThroughput(true, true, programArgs::LOCAL);
     #endif
 
-    // For rest, make sure BENCHMARK is not defined.
+    // For the following benchmarks, make sure the BENCHMARK macro (top of file) is not defined.
     #ifndef BENCHMARK
         // Measure latency of 1 alignment.
         benchmarkEndToEndLatency(true, true, programArgs::GLOBAL, 1);
