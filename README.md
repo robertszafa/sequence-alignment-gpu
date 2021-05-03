@@ -2,8 +2,10 @@
 
 
 ### Run on Barkla (no prerequisites required)
-       1. Get code from my directory:
-              cp /users/sgrszafa/sequence-alignment-gpu ~
+       1. Get code base:
+              cd
+              tar -xf ~sgrszafa/sequence-alignment-gpu.tgz
+              cd sequence-alignment-gpu
        2. Load Cuda and a C compiler:
               module load libs/nvidia-cuda/10.1.168/bin && module load compilers/gcc/8.3.0
        3. Run:
@@ -13,20 +15,20 @@
               ./alignSequence
 
               // Will run on Nvidia V100 (or P100) using sbatch.
+              // Fill out barkla_alignSequence.sh with your desired input sequences.
               sbatch barkla_runBenchmark.sh
               sbatch barkla_runTest.sh
-              // Fill out barkla_alignSequence.sh with your input
               sbatch barkla_alignSequence.sh
 
 
-### Run anywhere else
+### Run locally
        1. Check prerequisites.
        2. Unzip code
        3. Compile with:
               make -j
        4. Run:
               // Main program
-              ./alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile patternSequenceFile
+              Usage: ./alignSequence [-d|-p] [-c|-g] [--global|--local] [-s <file>] [--gap-penalty <int>] <file> <file>
                      -d, --dna             - align dna sequences (default)
                      -p, --protein         - align protein sequence
                      -c, --cpu             - use cpu device (default)
@@ -39,7 +41,7 @@
               // test suite
               ./test
 
-              // benchmarks
+              // performance tests
               ./benchmark
 
 

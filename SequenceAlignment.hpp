@@ -33,7 +33,7 @@ namespace SequenceAlignment
 
     /// User messages for stdout.
     const std::string USAGE = "\
-Usage: alignSequence [-p -d -c -g] [-m scoreMatrixFile] textSequenceFile patternSequenceFile\n\
+Usage: ./alignSequence [-d|-p] [-c|-g] [--global|--local] [-s <file>] [--gap-penalty <int>] <file> <file>\n\
        -d, --dna             - align dna sequences (default)\n\
        -p, --protein         - align protein sequence\n\
        -c, --cpu             - use cpu device (default)\n\
