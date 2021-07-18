@@ -332,6 +332,36 @@ void benchmarkEndToEndBatch (const bool cpu, const bool gpu, const programArgs a
 }
 
 
+void benchmarkMaxLength (const programArgs alignType)
+{
+    const std::vector<std::pair<uint64_t, uint64_t>> benchmarkSizes =
+    {
+        std::make_pair(120000, 120000),
+        std::make_pair(500000, 500000),
+    };
+
+    std::string alignTypeStr = (alignType == programArgs::GLOBAL) ? "Global" : "Local";
+
+    std::cout << "\n" << alignTypeStr << " alignment benchmark:\n";
+
+    for (const auto &sizePair : benchmarkSizes)
+    {
+        uint64_t numRows = sizePair.first;
+        uint64_t numCols = sizePair.second;
+        std::cout << "-----  " << numRows << " x " << numCols << "  -----\n";
+
+        SequenceAlignment::Request request;
+        SequenceAlignment::Response response;
+        fillDummyRequest(request, numRows, numCols, alignType);
+
+        // No repeats when testing longest.
+        uint64_t gpuTime = SequenceAlignment::alignSequenceGPU(request, &response);
+
+        std::cout << "GPU = " << (gpuTime / 1000) << " ms\n"
+                  << "MCUPS: " << ((numRows * numCols) / gpuTime) << "\n\n";
+    }
+}
+
 
 int main(int argc, const char *argv[])
 {
@@ -341,12 +371,17 @@ int main(int argc, const char *argv[])
     cudaGetDeviceProperties(&deviceProp, 0);
     std::cout << "Benchmark on GPU: " << deviceProp.name << "\n";
 
+    // Filling of M throughput (no traceback).
     // For these, make sure BENCHMARK is defined.
     #ifdef BENCHMARK
-        benchmarkFillMatrixThroughput(true, true, programArgs::GLOBAL);
-        benchmarkFillMatrixThroughput(true, true, programArgs::LOCAL);
+        // benchmarkFillMatrixThroughput(true, true, programArgs::GLOBAL);
+        // benchmarkFillMatrixThroughput(true, true, programArgs::LOCAL);
+
+        // Uncomment to validate max length results.
+        benchmarkMaxLength (programArgs::LOCAL);
     #endif
 
+    // Filling of M & traceback latency.
     // For the following benchmarks, make sure the BENCHMARK macro (top of file) is not defined.
     #ifndef BENCHMARK
         // Measure latency of 1 alignment.

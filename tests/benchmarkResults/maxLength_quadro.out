@@ -1,0 +1,7 @@
+Benchmark on GPU: Quadro P4000
+
+Local alignment benchmark:
+-----  500000 x 500000  -----
+GPU = 165019 ms
+MCUPS: 1514
+

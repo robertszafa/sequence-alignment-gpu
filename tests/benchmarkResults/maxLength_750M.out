@@ -1,0 +1,7 @@
+Benchmark on GPU: GeForce GT 750M
+
+Local alignment benchmark:
+-----  120000 x 120000  -----
+GPU = 47264 ms
+MCUPS: 304
+
